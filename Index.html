@@ -1,0 +1,291 @@
+ 
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Прана: Сакральный Код</title>
+    <style>
+        :root { 
+            --bg-start: #050520; --bg-end: #150025;   
+            --ochre: #CC7722; --gold: #B8860B;     
+            --cyan: #008B8B; --correct: #2E8B57; 
+            --bg-gradient: linear-gradient(135deg, var(--bg-start) 0%, var(--bg-end) 100%);
+        }
+        
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: var(--bg-gradient); color: var(--ochre); font-family: sans-serif; overflow: hidden; display: flex; flex-direction: column; }
+
+        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.3); border-bottom: 1px solid var(--ochre); height: 50px; flex-shrink: 0; box-sizing: border-box; z-index: 10; }
+        .nav-menu { display: flex; overflow-x: auto; background: rgba(0,0,0,0.2); padding: 5px; gap: 5px; height: 45px; flex-shrink: 0; box-sizing: border-box; z-index: 10; }
+        .nav-menu button { background: rgba(0,0,0,0.4); border: 1px solid var(--ochre); color: var(--ochre); padding: 5px 10px; border-radius: 4px; font-size: 10px; white-space: nowrap; }
+        .nav-menu button.active { background: var(--ochre); color: var(--bg-start); font-weight: bold; }
+
+        .c1 { background: #8B0000; color: #fff; } .c2 { background: #B8860B; color: #000; } .c3 { background: #556B2F; color: #fff; } 
+        .c4 { background: #006400; color: #fff; } .c5 { background: #4682B4; color: #fff; } .c6 { background: #4B0082; color: #fff; } 
+        .c7 { background: #800080; color: #fff; } .c8 { background: #A52A2A; color: #fff; } .c9 { background: #2F4F4F; color: #fff; }
+
+        .shape { width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; font-weight: bold; position: relative; margin: 5px; transition: 0.3s; z-index: 1; }
+        .s0 { border-radius: 50%; } .s1 { border-radius: 8px; } .s2 { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); padding-top: 10px; height: 45px; } .s3 { transform: rotate(45deg); width: 40px; height: 40px; } .s3 span { transform: rotate(-45deg); display: block; }
+
+        #viewport { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; z-index: 1; }
+        #flower-svg-container { width: 85%; max-width: 350px; transition: transform 4s linear, filter 0.5s; cursor: pointer; z-index: 5; }
+        .flower-svg { width: 100%; height: 100%; stroke: var(--gold); fill: none; stroke-width: 0.4; }
+        .sanskrit { fill: var(--gold); stroke: none; font-size: 7px; font-family: serif; text-anchor: middle; opacity: 0.8; pointer-events: none; }
+
+        /* Анимация сияния при кратности 10 */
+        .prana-glow { animation: pulse-glow 1s ease-out; }
+        @keyframes pulse-glow {
+            0% { filter: drop-shadow(0 0 5px var(--gold)); }
+            50% { filter: drop-shadow(0 0 40px var(--gold)) brightness(2); transform: scale(1.05); }
+            100% { filter: drop-shadow(0 0 5px var(--gold)); }
+        }
+
+        #game-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-gradient); display: none; flex-direction: column; z-index: 100; }
+        #game-display { height: 45%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-bottom: 1px solid var(--ochre); padding: 10px; box-sizing: border-box; }
+        #numpad-zone { height: 55%; background: rgba(0,0,0,0.3); padding: 10px; overflow-y: auto; box-sizing: border-box; }
+        
+        .grid-num { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 300px; margin: 0 auto; }
+        .grid-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; max-width: 300px; margin: 0 auto; }
+        .grid-alpha { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+        
+        .k { background: rgba(0,0,0,0.4); border: 1px solid var(--ochre); color: var(--ochre); padding: 18px 0; border-radius: 10px; font-size: 1.4rem; touch-action: manipulation; font-weight: bold; }
+        .k:active { background: var(--ochre); color: #000; }
+
+        .settings-panel { background: rgba(0,0,0,0.5); border-top: 1px solid var(--ochre); padding: 5px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; height: 50px; flex-shrink: 0; box-sizing: border-box; z-index: 10; }
+        .settings-panel input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--ochre); color: var(--gold); text-align: center; border-radius: 4px; font-size: 10px; }
+
+        #ref-modal, #intro-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-gradient); z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 25px; box-sizing: border-box; text-align: center; overflow-y: auto; }
+        .mode-desc { font-size: 0.8rem; color: var(--gold); margin-bottom: 15px; padding: 5px; border: 1px solid rgba(184, 134, 11, 0.3); background: rgba(0,0,0,0.2); border-radius: 5px; line-height: 1.3; }
+
+        #video-container { position: fixed; bottom: 60px; right: 10px; width: 180px; height: 100px; background: #000; border: 1px solid var(--gold); z-index: 200; display: none; border-radius: 8px; overflow: hidden; }
+        #video-container iframe { width: 100%; height: 100%; border: none; }
+        .video-close { position: absolute; top: 0; right: 0; background: red; color: white; border: none; font-size: 10px; cursor: pointer; z-index: 210; }
+
+        #inv-text { position:absolute; top:5%; font-size:2rem; color:var(--gold); opacity:0; pointer-events:none; width:100%; text-align:center; }
+        
+        #balloon { 
+            width: 50px; height: 60px; background: radial-gradient(circle at 30% 30%, var(--ochre), #442200); 
+            border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; 
+            margin: 10px auto; box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+            animation: float 4s infinite ease-in-out;
+        }
+        @keyframes float { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-15px) rotate(2deg); } }
+    </style>
+</head>
+<body>
+
+<div id="intro-modal">
+    <div style="max-width:600px; text-align:left;">
+        <h1 style="color: var(--gold); text-align: center;">ПРАНА: САКРАЛЬНЫЙ КОД</h1>
+        <p>Практика развития <b>нейронных связей</b> и осознанного дыхания.</p>
+        <p><b>Реверсия:</b> Есть те, кто вдыхает [мысленно] в выдох и выдыхает [мысленно] во вдох. Это нейтрализует животный рефлекс. (Бхагавад Гита 4.25-29).</p>
+        <button class="start-btn" style="width: 100%; background: var(--ochre); border:none; padding:15px; border-radius:30px; font-weight:bold;" onclick="startGame()">ВОЙТИ В ПОТОК</button>
+    </div>
+</div>
+
+<div class="top-bar">
+    <div style="color:var(--gold)">✨ <span id="prana-val">0</span></div>
+    <div id="status-label" style="color:var(--gold); font-size: 10px; letter-spacing: 2px;">ВДОХ</div>
+    <button onclick="toggleVideo()" style="font-size:9px; border-color:var(--cyan); color:var(--cyan); background:none; border:1px solid; border-radius:4px; padding:2px 5px;">ВИДЕО</button>
+    <button onclick="toggleRef()" style="border:1px solid var(--ochre); background:none; color:var(--ochre); padding:5px 10px; border-radius:4px; font-size:10px;">СПРАВКА</button>
+</div>
+
+<div class="nav-menu">
+    <button onclick="exitGame()" id="btn-home" class="active">ДЫХАНИЕ</button>
+    <button onclick="startMode(1)">МЕДИТАЦИЯ</button>
+    <button onclick="startMode(2)">СИМВОЛ</button>
+    <button onclick="startMode(3)">АРИФМЕТИКА</button>
+    <button onclick="startMode(4)">ВЕС СЛОВА</button>
+    <button onclick="startMode(5)">ШАР</button>
+</div>
+
+<div id="viewport">
+    <div id="inv-text">ВДОХ</div>
+    <div id="flower-svg-container" onclick="addPrana(1)">
+        <svg id="main-svg" class="flower-svg" viewBox="0 0 100 100">
+            <g id="flower-geometry">
+                <circle cx="50" cy="50" r="48" stroke-width="0.2"/>
+                <!-- Буквы в пустых пространствах -->
+                <text x="50" y="42" class="sanskrit">ॐ</text>
+                <text x="50" y="59" class="sanskrit">लं</text>
+                <text x="42" y="46" class="sanskrit">वं</text>
+                <text x="58" y="46" class="sanskrit">रं</text>
+                <text x="42" y="55" class="sanskrit">यं</text>
+                <text x="58" y="55" class="sanskrit">हं</text>
+                <text x="50" y="50.5" class="sanskrit">अं</text>
+
+                <circle cx="50" cy="50" r="15.5"/><circle cx="50" cy="34.5" r="15.5"/><circle cx="50" cy="65.5" r="15.5"/>
+                <circle cx="36.5" cy="42.2" r="15.5"/><circle cx="63.5" cy="42.2" r="15.5"/>
+                <circle cx="36.5" cy="57.8" r="15.5"/><circle cx="63.5" cy="57.8" r="15.5"/>
+                <circle cx="50" cy="19" r="15.5"/><circle cx="50" cy="81" r="15.5"/>
+                <circle cx="23" cy="34.5" r="15.5"/><circle cx="77" cy="34.5" r="15.5"/>
+                <circle cx="23" cy="65.5" r="15.5"/><circle cx="77" cy="65.5" r="15.5"/>
+                <circle cx="36.5" cy="26.8" r="15.5"/><circle cx="63.5" cy="26.8" r="15.5"/>
+                <circle cx="36.5" cy="73.2" r="15.5"/><circle cx="63.5" cy="73.2" r="15.5"/>
+            </g>
+        </svg>
+    </div>
+    <div id="game-layer">
+        <div id="game-display">
+            <div id="task-content"></div>
+            <div id="input-buffer" style="font-size: 2rem; color: var(--gold); margin-top: 10px; min-height: 2.5rem;"></div>
+        </div>
+        <div id="numpad-zone"><div id="keys-container"></div></div>
+        <button onclick="exitGame()" style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.5); border:1px solid var(--ochre); color:white; padding:8px; border-radius:5px;">ВЫХОД</button>
+    </div>
+</div>
+
+<div id="video-container">
+    <button class="video-close" onclick="toggleVideo()">X</button>
+    <iframe id="vk-video" src="" allow="autoplay; encrypted-media; fullscreen" frameborder="0"></iframe>
+</div>
+
+<div class="settings-panel">
+    <div><input type="number" id="t-in" value="4"></div>
+    <div><input type="number" id="t-p1" value="0"></div>
+    <div><input type="number" id="t-out" value="4"></div>
+    <div><input type="number" id="t-p2" value="0"></div>
+    <div><input type="number" id="t-freq" value="3"></div>
+</div>
+
+<div id="ref-modal" style="display:none; overflow-y:auto; padding:20px; box-sizing:border-box;">
+    <h3 style="color:var(--gold); text-align:center;">Таблица Нейро-Кодов</h3>
+    <div id="ref-content" style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;"></div>
+    <button onclick="toggleRef()" style="width:100%; margin-top:20px; padding:15px; background:var(--ochre); border:none; border-radius:8px; font-weight:bold;">ЗАКРЫТЬ</button>
+</div>
+
+<div id="flash-msg" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); display:none; z-index:6000; align-items:center; justify-content:center; text-align:center; padding:20px;" onclick="this.style.display='none'"><h2 id="msg-text" style="color:var(--gold); font-size:1.2rem;"></h2></div>
+
+<script>
+    const CONFIG = { 1: ['И','С','Э'], 2: ['А','Й','П','Т'], 3: ['Б','З','М','Ю'], 4: ['В','К','Ф','Я'], 5: ['Д','Л','Х','Ы'], 6: ['Е','О','Ц','Ь'], 7: ['Ё','Н','Ъ'], 8: ['Г','У','Ч','Щ'], 9: ['Ж','Р','Ш'] };
+    const shapes = ['s0','s1','s2','s3'];
+    const sensory = ["Почувствуй тепло в груди", "Звук тишины", "Вибрация в пальцах", "Мурашки на коже", "Расслабь челюсть", "Ощути одежду на плечах", "Почувствуй ладони", "Ощути влажность слизистых", "Заметь пульсацию"];
+    const phrases = ["Чистый дух", "Всё и ничто", "Истина пустота", "Живо бытие", "Голограмма", "Присутствие Вечное"];
+    let letterMap = {};
+    for (let k in CONFIG) CONFIG[k].forEach((l, i) => letterMap[l] = { code: k, color: 'c'+k, shape: shapes[i] });
+    
+    let prana = parseFloat(localStorage.getItem('prana_v14')) || 0;
+    let nextSensoryPrana = prana + 100;
+    let mode = 0, currentInput = "", targetVal = 0, phraseIdx = 0, charIdx = 0, breathStep = 0, isProcessing = false, balloonSize = 1;
+
+    function startGame() { document.getElementById('intro-modal').style.display = 'none'; runBreath(); }
+
+    function runBreath() {
+        const flower = document.getElementById('flower-svg-container');
+        const label = document.getElementById('status-label');
+        const tIn = parseFloat(document.getElementById('t-in').value);
+        const tP1 = parseFloat(document.getElementById('t-p1').value);
+        const tOut = parseFloat(document.getElementById('t-out').value);
+        const tP2 = parseFloat(document.getElementById('t-p2').value);
+        const times = [tIn*1000, tP1*1000, tOut*1000, tP2*1000];
+
+        if (breathStep === 0) { label.innerText = "ВЫДОХ"; flower.style.transition = `transform ${tIn}s linear`; flower.style.transform = "scale(0.4)"; }
+        else if (breathStep === 2) { label.innerText = "ВДОХ"; flower.style.transition = `transform ${tOut}s linear`; flower.style.transform = "scale(1.2)"; }
+        else label.innerText = "ЗАДЕРЖКА";
+        
+        setTimeout(() => { breathStep = (breathStep + 1) % 4; if(breathStep === 0) addPrana(10); runBreath(); }, times[breathStep] || 1);
+    }
+
+    function addPrana(v) { 
+        prana += v; document.getElementById('prana-val').innerText = Math.floor(prana); localStorage.setItem('prana_v14', prana); 
+        if (Math.floor(prana) % 10 === 0 && v > 0) {
+            const f = document.getElementById('flower-svg-container');
+            f.classList.add('prana-glow');
+            setTimeout(() => f.classList.remove('prana-glow'), 1000);
+        }
+        if(prana >= nextSensoryPrana) { triggerSensory(); nextSensoryPrana += 100; }
+    }
+
+    function toggleVideo() {
+        const vc = document.getElementById('video-container');
+        const frame = document.getElementById('vk-video');
+        if(vc.style.display === 'block') { vc.style.display = 'none'; frame.src = ""; }
+        else { vc.style.display = 'block'; frame.src = "https://vk.com/video_ext.php?oid=-186690269&id=456239332&hash=f593881523457a41"; }
+    }
+
+    function startMode(m) { mode = m; currentInput = ""; charIdx = 0; balloonSize = 1; document.getElementById('game-layer').style.display = 'flex'; renderGame(); }
+    function exitGame() { mode = 0; document.getElementById('game-layer').style.display = 'none'; }
+
+    function renderGame() {
+        const task = document.getElementById('task-content');
+        const keys = document.getElementById('keys-container');
+        const view = document.getElementById('input-buffer');
+        keys.innerHTML = ''; view.innerText = "";
+        let info = "";
+        if (mode === 1) {
+            info = "МЕДИТАЦИЯ: Вспомни код каждой буквы.";
+            const p = phrases[phraseIdx].toUpperCase();
+            let h = '<div>'; for(let i=0; i<p.length; i++) h += `<span style="color:${i<charIdx?'var(--correct)':'rgba(204,119,34,0.3)'}">${p[i]}</span>`;
+            task.innerHTML = `<div class="mode-desc">${info}</div>` + h + '</div>';
+            drawNumpad(keys, true);
+        } else if (mode === 2) {
+            info = "СИМВОЛ: Угадай букву.";
+            const l = Object.keys(letterMap); const t = l[Math.floor(Math.random()*l.length)];
+            task.innerHTML = `<div class="mode-desc">${info}</div>` + getShapeHTML(t, true, true);
+            task.dataset.ans = t; drawAlpha(keys, t);
+        } else if (mode === 3) {
+            info = "АРИФМЕТИКА: Выбери ответ.";
+            const l = Object.keys(letterMap); const a = l[Math.floor(Math.random()*l.length)], b = l[Math.floor(Math.random()*l.length)];
+            targetVal = parseInt(letterMap[a].code) + parseInt(letterMap[b].code);
+            task.innerHTML = `<div class="mode-desc">${info}</div><div style="display:flex; align-items:center; justify-content:center;">${getShapeHTML(a)} + ${getShapeHTML(b)}</div>`;
+            drawOptions(keys);
+        } else if (mode === 4) {
+            info = "ВЕС СЛОВА: Сложи коды всех букв.";
+            const w = phrases[phraseIdx].split(' ')[0].toUpperCase();
+            targetVal = 0; [...w].forEach(c => targetVal += parseInt(letterMap[c].code));
+            task.innerHTML = `<div class="mode-desc">${info}</div><div style="font-size:1.5rem">${w}</div>`;
+            drawNumpad(keys, false);
+        } else if (mode === 5) {
+            info = "ШАР: Дополни число до 10, выбрав нужную букву.";
+            const letters = Object.keys(letterMap); const rChar = letters[Math.floor(Math.random() * letters.length)];
+            targetVal = 10 - parseInt(letterMap[rChar].code);
+            task.innerHTML = `<div class="mode-desc">${info}</div><div id="balloon" style="transform: scale(${balloonSize})"></div>${getShapeHTML(rChar, false, true)}`;
+            drawAlpha(keys, null);
+        }
+    }
+
+    function getShapeHTML(l, isB, sC) { const d = letterMap[l]; return `<div class="shape ${d.shape} ${d.color}" style="${isB?'width:75px;height:75px;font-size:1.8rem;':''}"><span>${sC?d.code:l}</span></div>`; }
+
+    function drawNumpad(el, auto) {
+        el.className = 'grid-num';
+        for(let i=1; i<=9; i++) addK(el, i, () => { if(isProcessing) return; if(auto) { currentInput=i; check(); } else { currentInput+=i; document.getElementById('input-buffer').innerText = currentInput; } });
+        addK(el, 'C', () => { currentInput=""; document.getElementById('input-buffer').innerText=""; });
+        addK(el, '0', () => { if(auto) { currentInput=0; check(); } else { currentInput+='0'; document.getElementById('input-buffer').innerText = currentInput; } });
+        if(!auto) addK(el, 'OK', check);
+    }
+    
+    function drawOptions(el) { el.className = 'grid-options'; let opts = [targetVal]; while(opts.length < 4) { let r = targetVal + Math.floor(Math.random()*7)-3; if(r>0 && !opts.includes(r)) opts.push(r); } opts.sort(()=>Math.random()-0.5).forEach(o => addK(el, o, () => { currentInput=o; check(); })); }
+
+    function drawAlpha(el, target) {
+        el.className = 'grid-alpha';
+        "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ".split('').forEach(l => {
+            const b=document.createElement('button'); b.className='k'; b.innerText=l; b.style.fontSize='12px'; b.style.padding='10px 0';
+            b.onclick=()=>{ if(isProcessing) return; if(mode===5){currentInput=letterMap[l].code; check();} else if(l===target){addPrana(30); renderGame();} }; el.appendChild(b);
+        });
+    }
+
+    function addK(el, t, fn) { const b=document.createElement('button'); b.className='k'; b.innerText=t; b.onclick=fn; el.appendChild(b); }
+
+    function check() {
+        if (isProcessing) return;
+        const view = document.getElementById('input-buffer');
+        if (mode === 1) {
+            const p = phrases[phraseIdx].toUpperCase().replace(/\s/g,'');
+            if (letterMap[p[charIdx]].code == currentInput) { charIdx++; addPrana(15); if (charIdx >= p.length) { charIdx = 0; phraseIdx = (phraseIdx + 1) % phrases.length; addPrana(50); } }
+            else charIdx = 0; currentInput = ""; renderGame();
+        } else if (mode === 5) {
+            isProcessing = true;
+            if (parseInt(currentInput) === targetVal) { balloonSize += 0.35; addPrana(25); if (balloonSize >= 3.5) { view.innerText = "БАБАХ! ✨"; addPrana(500); balloonSize = 1; setTimeout(renderGame, 800); } else renderGame(); isProcessing = false; }
+            else { view.innerText = "❌"; setTimeout(() => { currentInput = ""; renderGame(); isProcessing = false; }, 400); }
+        } else {
+            isProcessing = true; const isCorrect = parseInt(currentInput) === targetVal;
+            if (isCorrect) { view.innerText = "ВЕРНО ✨"; addPrana(40); setTimeout(() => { currentInput = ""; renderGame(); isProcessing = false; }, 600); }
+            else { view.innerText = "ОШИБКА ❌"; setTimeout(() => { currentInput = ""; view.innerText = ""; isProcessing = false; }, 600); }
+        }
+    }
+    
+    function toggleRef() { const m = document.getElementById('ref-modal'); m.style.display = m.style.display === 'block' ? 'none' : 'block'; if(m.style.display === 'block') { const c = document.getElementById('ref-content'); c.innerHTML = ''; for(let l in letterMap) { const d = letterMap[l]; c.innerHTML += `<div style="border:1px solid var(--ochre);padding:5px;text-align:center;border-radius:5px;"><div>${l}</div><div class="shape ${d.shape} ${d.color}" style="width:25px;height:25px;margin:5px auto;font-size:9px;color:#000;"><span>${d.code}</span></div></div>`; } } }
+    function triggerSensory() { document.getElementById('msg-text').innerText = sensory[Math.floor(Math.random()*sensory.length)]; document.getElementById('flash-msg').style.display = 'flex'; }
+</script>
+</body>
+</html>
