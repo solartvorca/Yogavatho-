@@ -66,9 +66,10 @@ let hiScore = +localStorage.getItem('nk_hi') || 0;
 
 // runner
 let score=0, lives=3, worldIdx=0;
-let blocks=[], particles=[], bgDots=[], specials=[];
+let blocks=[], particles=[], bgDots=[], specials=[], dustParts=[];
 let spawnT=0, spawnI=80, specT=0;
 let transitioning=false, transTimer=0, transName='';
+let runSpeed=4; // world scroll speed
 
 // quiz
 let qDiff=1, qScore=0, qStreak=0;
@@ -115,11 +116,12 @@ const P = {
   x:0, y:0, vy:0, r:14,
   letter:'А', jumps:0,
   trail:[], glow:0, flash:0,
+  onGround:true, runStep:0,
 
   reset(){
     this.x = W*0.2; this.y = GY - this.r;
     this.vy=0; this.jumps=0; this.trail=[];
-    this.glow=0; this.flash=0;
+    this.glow=0; this.flash=0; this.runStep=0;
     this.letter = rndL();
   },
 
@@ -130,10 +132,26 @@ const P = {
   update(){
     this.vy += H*0.0011;
     this.y  += this.vy;
-    if(this.y >= GY - this.r){ this.y = GY-this.r; this.vy=0; this.jumps=0; }
-    this.trail.push({x:this.x, y:this.y, a:1});
-    if(this.trail.length > 14) this.trail.shift();
-    this.trail.forEach(t=>t.a -= 0.07);
+    const prevGround = this.onGround;
+    if(this.y >= GY - this.r){
+      this.y = GY-this.r; this.vy=0; this.jumps=0; this.onGround=true;
+    } else { this.onGround=false; }
+
+    // running bob when on ground
+    if(this.onGround){
+      this.runStep += 0.22;
+      // dust every half-step
+      if(Math.floor(this.runStep)%2===0 && rnd(1)<0.3){
+        dustParts.push({x:this.x-this.r,y:GY,vx:-rnd(2)-0.5,vy:-rnd(1.5)-0.5,a:0.7,sz:rnd(3)+1});
+      }
+    }
+
+    // push trail from slightly behind (creates forward-motion illusion)
+    const trailX = this.x - this.r*0.5;
+    const trailY = this.onGround ? this.y + Math.sin(this.runStep)*2 : this.y;
+    this.trail.push({x:trailX, y:trailY, a:1});
+    if(this.trail.length > 18) this.trail.shift();
+    this.trail.forEach(t=>t.a -= 0.055);
     if(this.glow > 0) this.glow -= 0.04;
     if(this.flash > 0) this.flash -= 0.08;
   },
@@ -141,13 +159,22 @@ const P = {
   draw(){
     const col = this.flash>0 ? '#ff4444' : CODE_COLOR[LETTER_MAP[this.letter]?.code||1];
 
-    // trail
-    this.trail.forEach(t=>{
+    // speed lines — show forward motion
+    cx.save(); cx.globalAlpha=0.18; cx.strokeStyle=col; cx.lineWidth=1.5;
+    for(let i=0;i<5;i++){
+      const lx = this.x - this.r*2 - i*12;
+      const ly = this.y - 4 + i*2;
+      cx.beginPath(); cx.moveTo(lx,ly); cx.lineTo(lx-18-i*4,ly); cx.stroke();
+    }
+    cx.restore();
+
+    // trail (elongated to the left = running right)
+    this.trail.forEach((t,i)=>{
       if(t.a<=0) return;
-      cx.save(); cx.globalAlpha = t.a*0.35;
+      cx.save(); cx.globalAlpha = t.a*0.4;
       cx.globalCompositeOperation='lighter';
       cx.fillStyle = col;
-      cx.beginPath(); cx.arc(t.x,t.y,this.r*t.a*0.7,0,Math.PI*2); cx.fill();
+      cx.beginPath(); cx.arc(t.x,t.y,this.r*t.a*0.65,0,Math.PI*2); cx.fill();
       cx.restore();
     });
 
@@ -158,11 +185,12 @@ const P = {
     cx.fillStyle=gr; cx.beginPath(); cx.arc(this.x,this.y,this.r*(2.5+this.glow*1.5),0,Math.PI*2); cx.fill();
     cx.restore();
 
-    // core
+    // core — slight bob when running
+    const bobY = this.onGround ? Math.sin(this.runStep)*2.5 : 0;
     cx.save();
     cx.shadowColor=col; cx.shadowBlur=20;
     cx.fillStyle='#ffffff';
-    cx.beginPath(); cx.arc(this.x,this.y,this.r,0,Math.PI*2); cx.fill();
+    cx.beginPath(); cx.arc(this.x, this.y+bobY, this.r, 0, Math.PI*2); cx.fill();
     cx.restore();
 
     // letter
@@ -170,7 +198,7 @@ const P = {
     cx.font = pxFont(this.r*1.1);
     cx.fillStyle='#0a0a1a';
     cx.textAlign='center'; cx.textBaseline='middle';
-    cx.fillText(this.letter, this.x, this.y+1);
+    cx.fillText(this.letter, this.x, this.y+bobY+1);
     cx.restore();
   }
 };
@@ -186,7 +214,7 @@ function spawnBlock(){
   const sz      = 38 + rndI(20);
   const elevated= !isObs && Math.random()<0.3;
   const y       = elevated ? GY - sz - H*0.22 : GY - sz;
-  const spd     = 3.2 + score*0.06;
+  const spd     = runSpeed;
 
   blocks.push({ x:W+sz, y, sz, code, isObs, isRight, spd, shape:rndI(4), done:false });
 }
@@ -307,6 +335,20 @@ function addParticles(x,y,col,n){
   }
 }
 
+function updateDust(){
+  dustParts = dustParts.filter(d=>d.a>0);
+  dustParts.forEach(d=>{ d.x+=d.vx; d.y+=d.vy; d.vy-=0.05; d.a-=0.06; });
+}
+
+function drawDust(){
+  dustParts.forEach(d=>{
+    cx.save(); cx.globalAlpha=d.a*0.5;
+    cx.fillStyle=WORLDS[worldIdx].top;
+    cx.beginPath(); cx.arc(d.x,d.y,d.sz,0,Math.PI*2); cx.fill();
+    cx.restore();
+  });
+}
+
 function updateParticles(){
   particles = particles.filter(p=>p.a>0);
   particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.vx*=0.95; p.a-=0.035; });
@@ -337,9 +379,9 @@ function drawWorld(){
   sg.addColorStop(0,w.sky); sg.addColorStop(1,w.sky+'88');
   cx.fillStyle=sg; cx.fillRect(0,0,W,GY);
 
-  // background dots (stars/bubbles/leaves)
+  // background dots scroll at run speed to show motion
   bgDots.forEach(d=>{
-    d.x-=d.spd; if(d.x<-2)d.x=W+2;
+    d.x -= d.spd + runSpeed*0.4; if(d.x<-2)d.x=W+2;
     d.y+=Math.sin(frame*0.02+d.x*0.01)*0.4;
     cx.save(); cx.globalAlpha=d.op;
     cx.fillStyle=w.ptc;
@@ -870,8 +912,8 @@ function onTap(ex,ey){
 function doMenuAction(a){
   switch(a){
     case 'run':
-      score=0; lives=3; blocks=[]; particles=[]; specials=[];
-      spawnT=0; spawnI=80; specT=0; frame=0; transitioning=false;
+      score=0; lives=3; blocks=[]; particles=[]; specials=[]; dustParts=[];
+      spawnT=0; spawnI=80; specT=0; frame=0; transitioning=false; runSpeed=3.5;
       worldIdx=rndI(WORLDS.length);
       initBgDots(); P.reset(); screen='runner'; break;
     case 'qs':
@@ -920,8 +962,10 @@ function loop(){
       updateParticles(); drawParticles();
       break;
     case 'runner':
+      runSpeed = 3.5 + score * 0.06;
       drawWorld();
       updateSpecials(); drawSpecialObjects();
+      updateDust(); drawDust();
       P.update(); updateBlocks();
       blocks.forEach(drawBlock);
       P.draw();
