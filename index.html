@@ -282,24 +282,36 @@
             contain: layout;
         }
 
+        .game-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            flex-shrink: 0;
+            border-bottom: 1px solid rgba(255,215,0,0.1);
+            min-height: 48px;
+            gap: 8px;
+        }
+
         #game-display {
-            height: 35%;
+            flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             text-align: center;
             border-bottom: 1px solid rgba(255,215,0,0.2);
-            padding: 20px;
+            padding: 15px;
             box-sizing: border-box;
             background: linear-gradient(180deg, rgba(26,10,46,0.5) 0%, transparent 100%);
             contain: layout;
+            overflow-y: auto;
         }
 
         #numpad-zone {
-            height: 65%;
+            flex: 2;
             background: rgba(10,10,26,0.4);
-            padding: 20px;
+            padding: 15px;
             overflow-y: auto;
             box-sizing: border-box;
             contain: layout;
@@ -888,9 +900,6 @@
         }
 
         .load-text-btn {
-            position: absolute;
-            top: 15px;
-            left: 15px;
             background: rgba(139,92,246,0.2);
             border: 1px solid rgba(139,92,246,0.4);
             color: var(--violet);
@@ -900,7 +909,21 @@
             letter-spacing: 1px;
             cursor: pointer;
             transition: background 0.3s ease, box-shadow 0.3s ease;
-            z-index: 110;
+            white-space: nowrap;
+        }
+
+        #btn-exit-game {
+            background: rgba(255,215,0,0.1);
+            border: 1px solid rgba(255,215,0,0.4);
+            color: var(--gold-soft);
+            padding: 8px 15px;
+            border-radius: 25px;
+            font-size: 11px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .load-text-btn:hover {
@@ -989,13 +1012,16 @@
     </div>
 
     <div id="game-layer">
-        <button class="load-text-btn" id="load-text-btn" style="display:none;">ЗАГРУЗИТЬ ТЕКСТ</button>
+        <div class="game-header">
+            <button class="load-text-btn" id="load-text-btn" style="display:none;">ЗАГРУЗИТЬ ТЕКСТ</button>
+            <div style="flex:1;"></div>
+            <button id="btn-exit-game">ВЫХОД</button>
+        </div>
         <div id="game-display">
             <div id="task-content"></div>
             <div id="input-buffer" style="font-size: 2.2rem; color: var(--gold); margin-top: 15px; min-height: 2.5rem; text-shadow: 0 0 20px var(--glow-gold);"></div>
         </div>
         <div id="numpad-zone"><div id="keys-container"></div></div>
-        <button id="btn-exit-game" style="position:absolute; top:15px; right:15px; background:rgba(255,215,0,0.1); border:1px solid rgba(255,215,0,0.4); color:var(--gold-soft); padding:10px 15px; border-radius:25px; font-size:11px; letter-spacing:1px; cursor:pointer; transition:all 0.3s;">ВЫХОД</button>
     </div>
 </div>
 
