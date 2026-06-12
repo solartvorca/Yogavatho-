@@ -202,12 +202,17 @@ const P = {
     drawShape(sh, this.x, py, this.r, '#ffffff', col);
     cx.restore();
 
-    // letter on the player
+    // letter on the player — dark absorbing halo for contrast
     cx.save();
-    cx.font=pxFont(this.r*0.95);
-    cx.fillStyle=col;
-    cx.shadowColor=col; cx.shadowBlur=6;
+    // dark circle behind the letter absorbs light from the shape
+    cx.globalCompositeOperation='multiply';
+    cx.fillStyle='rgba(0,0,0,0.72)';
+    cx.beginPath(); cx.arc(this.x, py, this.r*0.72, 0, Math.PI*2); cx.fill();
+    cx.globalCompositeOperation='source-over';
+    cx.font=pxFont(this.r*1.05);
+    cx.fillStyle='#ffffff';
     cx.textAlign='center'; cx.textBaseline='middle';
+    cx.shadowColor='#000000'; cx.shadowBlur=0;
     cx.fillText(this.letter, this.x, py+1);
     cx.restore();
   }
