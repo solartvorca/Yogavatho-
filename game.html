@@ -69,7 +69,11 @@ let score=0, lives=3, worldIdx=0;
 let blocks=[], particles=[], bgDots=[], specials=[], dustParts=[];
 let spawnT=0, spawnI=80, specT=0;
 let transitioning=false, transTimer=0, transName='';
-let runSpeed=4; // world scroll speed
+let runSpeed=4;
+
+const SPEED_STEPS  = [0.6, 1, 1.6, 2.4, 3.5];
+const SPEED_LABELS = ['0.6×', '1×', '1.6×', '2.4×', '3.5×'];
+let speedIdx = 2; // default 1.6× — feels like dino game
 
 // quiz
 let qDiff=1, qScore=0, qStreak=0;
@@ -221,7 +225,7 @@ function spawnBlock(){
 
 function updateBlocks(){
   spawnT++;
-  if(spawnT >= spawnI){ spawnT=0; spawnBlock(); spawnI=Math.max(45, 80-score*1.2); }
+  if(spawnT >= spawnI){ spawnT=0; spawnBlock(); spawnI=Math.max(22, Math.round((80-score*1.2)/SPEED_STEPS[speedIdx])); }
   blocks = blocks.filter(b=>b.x > -b.sz*2);
 
   blocks.forEach(b=>{
@@ -488,7 +492,7 @@ function drawHUD(){
     cx.restore();
   }
 
-  // restart button in HUD
+  // restart button — bottom left
   const rbw=H*0.1, rbh=H*0.065, rbx=W*0.03, rby=H*0.88;
   hudRestartRect={x:rbx,y:rby,w:rbw,h:rbh};
   cx.save();
@@ -497,6 +501,32 @@ function drawHUD(){
   cx.font=pxFont(H*0.03); cx.fillStyle='rgba(255,160,160,0.85)';
   cx.textAlign='center'; cx.textBaseline='middle';
   cx.fillText('↺',rbx+rbw/2,rby+rbh/2);
+  cx.restore();
+
+  // speed control — bottom right: [◀] 1.6× [▶]
+  const sbh=H*0.065, sbtnW=H*0.075, slabelW=H*0.14;
+  const sbBase = W - W*0.03 - sbtnW*2 - slabelW;
+  const sby = H*0.88;
+  hudSpeedMinus={x:sbBase,            y:sby, w:sbtnW,   h:sbh};
+  hudSpeedPlus ={x:sbBase+sbtnW+slabelW, y:sby, w:sbtnW, h:sbh};
+
+  cx.save();
+  // minus button
+  cx.fillStyle='rgba(100,180,255,0.12)'; cx.strokeStyle='rgba(100,180,255,0.45)'; cx.lineWidth=1.5;
+  roundRect(hudSpeedMinus.x,sby,sbtnW,sbh,sbh/2); cx.fill(); cx.stroke();
+  cx.font=pxFont(H*0.03); cx.fillStyle='rgba(150,210,255,0.9)';
+  cx.textAlign='center'; cx.textBaseline='middle';
+  cx.fillText('◀', hudSpeedMinus.x+sbtnW/2, sby+sbh/2);
+  // label
+  cx.font=pxFont(H*0.026); cx.fillStyle='#ffd700';
+  cx.shadowColor='#ffd700'; cx.shadowBlur=8;
+  cx.fillText(SPEED_LABELS[speedIdx], sbBase+sbtnW+slabelW/2, sby+sbh/2);
+  cx.shadowBlur=0;
+  // plus button
+  cx.fillStyle='rgba(100,180,255,0.12)'; cx.strokeStyle='rgba(100,180,255,0.45)';
+  roundRect(hudSpeedPlus.x,sby,sbtnW,sbh,sbh/2); cx.fill(); cx.stroke();
+  cx.fillStyle='rgba(150,210,255,0.9)'; cx.shadowBlur=0;
+  cx.fillText('▶', hudSpeedPlus.x+sbtnW/2, sby+sbh/2);
   cx.restore();
 }
 
@@ -858,6 +888,8 @@ function drawGameOver(){
 // ═══════════════════════════════════════════
 let backBtnRect={x:0,y:0,w:0,h:0};
 let hudRestartRect={x:0,y:0,w:0,h:0};
+let hudSpeedMinus={x:0,y:0,w:0,h:0};
+let hudSpeedPlus={x:0,y:0,w:0,h:0};
 function backBtn(){
   const bw=W*0.26, bh=H*0.055, bx=W*0.04, by=H-H*0.08;
   backBtnRect={x:bx,y:by,w:bw,h:bh};
@@ -889,6 +921,9 @@ function onTap(ex,ey){
   if(screen==='runner'){
     const r=hudRestartRect;
     if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h){ doMenuAction('run'); return; }
+    const sm=hudSpeedMinus, sp=hudSpeedPlus;
+    if(x>=sm.x&&x<=sm.x+sm.w&&y>=sm.y&&y<=sm.y+sm.h){ speedIdx=Math.max(0,speedIdx-1); return; }
+    if(x>=sp.x&&x<=sp.x+sp.w&&y>=sp.y&&y<=sp.y+sp.h){ speedIdx=Math.min(SPEED_STEPS.length-1,speedIdx+1); return; }
     P.jump(); return;
   }
 
@@ -999,7 +1034,7 @@ function loop(){
       updateParticles(); drawParticles();
       break;
     case 'runner':
-      runSpeed = 3.5 + score * 0.06;
+      runSpeed = (W * 0.008 + score * 0.04) * SPEED_STEPS[speedIdx];
       drawWorld();
       updateSpecials(); drawSpecialObjects();
       updateDust(); drawDust();
