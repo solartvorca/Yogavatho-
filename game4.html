@@ -254,12 +254,19 @@ function drawFig(x, y, r, si, color, letter, pop, code) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(letter, 0, letterY);
 
-  // Число кода — под буквой, маленькое, цветное
+  // Число кода — белое с тёмной обводкой для контраста
   if (code && hasRoom) {
-    ctx.shadowBlur = 4;
-    ctx.fillStyle = color;
-    ctx.font = `bold ${Math.max(r * .38, 7)}px monospace`;
+    ctx.font = `bold ${Math.max(r * .4, 8)}px monospace`;
+    // тёмная тень для читаемости
+    ctx.strokeStyle = 'rgba(0,0,0,.85)';
+    ctx.lineWidth = Math.max(r * .1, 2.5);
+    ctx.lineJoin = 'round';
+    ctx.strokeText(String(code), 0, r * .42);
+    // белый текст поверх
+    ctx.shadowColor = color; ctx.shadowBlur = 6;
+    ctx.fillStyle = '#ffffff';
     ctx.fillText(String(code), 0, r * .42);
+    ctx.shadowBlur = 0;
   }
 
   ctx.restore();
