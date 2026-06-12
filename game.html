@@ -181,7 +181,7 @@ const P = {
       cx.save(); cx.globalAlpha = t.a*0.4;
       cx.globalCompositeOperation='lighter';
       cx.fillStyle = col;
-      cx.beginPath(); cx.arc(t.x,t.y,this.r*t.a*0.65,0,Math.PI*2); cx.fill();
+      cx.beginPath(); cx.arc(t.x,t.y,Math.max(0.01,this.r*t.a*0.65),0,Math.PI*2); cx.fill();
       cx.restore();
     });
 
@@ -369,10 +369,10 @@ function updateParticles(){
 
 function drawParticles(){
   particles.forEach(p=>{
+    if(p.a<=0) return;
     cx.save(); cx.globalAlpha=p.a; cx.globalCompositeOperation='lighter';
     cx.fillStyle=p.col;
-    const pr = p.sz*p.a; if(pr<=0){ cx.restore(); return; }
-    cx.beginPath(); cx.arc(p.x,p.y,pr,0,Math.PI*2); cx.fill();
+    cx.beginPath(); cx.arc(p.x,p.y,Math.max(0.01,p.sz*p.a),0,Math.PI*2); cx.fill();
     cx.restore();
   });
 }
