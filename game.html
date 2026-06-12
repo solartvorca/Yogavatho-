@@ -65,16 +65,18 @@ let frame  = 0;
 let hiScore = +localStorage.getItem('nk_hi') || 0;
 
 // runner
-let score=0, lives=3, worldIdx=0;
+const MAX_LIVES = 5;
+let score=0, lives=MAX_LIVES, worldIdx=0;
 let blocks=[], particles=[], bgDots=[], specials=[], dustParts=[];
+let hearts=[], heartT=0;
 let spawnT=0, spawnI=80, specT=0;
 let transitioning=false, transTimer=0, transName='';
 let runSpeed=4;
+let deathFrame=-1; // -1=alive, 0+=dying (counts up to 20, then gameover)
 
 const SPEED_STEPS  = [0.6, 1, 1.6, 2.4, 3.5];
 const SPEED_LABELS = ['0.6×', '1×', '1.6×', '2.4×', '3.5×'];
 let speedIdx = 2;
-let dyingTimer = false; // guard against stale gameover setTimeout
 
 // quiz
 let qDiff=1, qScore=0, qStreak=0;
@@ -225,6 +227,7 @@ function spawnBlock(){
 }
 
 function updateBlocks(){
+  if(deathFrame>=0) return; // don't process collisions while dying
   spawnT++;
   if(spawnT >= spawnI){ spawnT=0; spawnBlock(); spawnI=Math.max(22, Math.round((80-score*1.2)/SPEED_STEPS[speedIdx])); }
   blocks = blocks.filter(b=>b.x > -b.sz*2);
@@ -245,10 +248,7 @@ function updateBlocks(){
         lives--;
         P.flash=1;
         addParticles(P.x,P.y,'#ff4444',8);
-        if(lives<=0 && !dyingTimer){
-          dyingTimer=true;
-          setTimeout(()=>{ dyingTimer=false; if(screen==='runner') screen='gameover'; }, 300);
-        }
+        if(lives<=0) deathFrame=0;
       }
     }
   });
@@ -372,6 +372,45 @@ function drawParticles(){
 }
 
 // ═══════════════════════════════════════════
+//  HEARTS (collectible lives)
+// ═══════════════════════════════════════════
+function updateHearts(){
+  heartT++;
+  if(heartT > 300+rndI(200) && lives < MAX_LIVES){
+    heartT=0;
+    const elevated = Math.random()<0.4;
+    const hy = elevated ? GY - H*0.22 - H*0.04 : GY - H*0.05;
+    hearts.push({x:W+30, y:hy, done:false});
+  }
+  hearts = hearts.filter(h=>h.x > -50);
+  hearts.forEach(h=>{
+    h.x -= runSpeed;
+    if(h.done) return;
+    const dist = Math.hypot(P.x-h.x, P.y-h.y);
+    if(dist < P.r + H*0.04){
+      h.done=true;
+      lives = Math.min(MAX_LIVES, lives+1);
+      addParticles(h.x, h.y, '#ff6b9d', 12);
+    }
+  });
+}
+
+function drawHearts(){
+  hearts.forEach(h=>{
+    if(h.done) return;
+    const bob = Math.sin(frame*0.1 + h.x*0.005)*H*0.008;
+    cx.save();
+    cx.font=pxFont(H*0.055);
+    cx.fillStyle='#ff6b9d';
+    cx.shadowColor='#ff6b9d'; cx.shadowBlur=22;
+    cx.textAlign='center'; cx.textBaseline='middle';
+    cx.globalCompositeOperation='lighter';
+    cx.fillText('♥', h.x, h.y+bob);
+    cx.restore();
+  });
+}
+
+// ═══════════════════════════════════════════
 //  WORLD BACKGROUND
 // ═══════════════════════════════════════════
 function initBgDots(){
@@ -459,16 +498,17 @@ function drawHUD(){
   cx.fillText('РЕК: '+hiScore, W*0.03, H*0.072);
   cx.restore();
 
-  // lives — top right
-  for(let i=0;i<3;i++){
-    cx.save();
-    cx.globalCompositeOperation='lighter';
-    cx.fillStyle = i<lives ? '#ff6b9d' : '#333';
+  // lives — top right (5 hearts)
+  cx.save();
+  cx.font=pxFont(H*0.03); cx.textAlign='center'; cx.textBaseline='middle';
+  for(let i=0;i<MAX_LIVES;i++){
+    cx.fillStyle   = i<lives ? '#ff6b9d' : 'rgba(255,107,157,0.15)';
     cx.shadowColor = i<lives ? '#ff6b9d' : 'transparent';
-    cx.shadowBlur  = i<lives ? 12 : 0;
-    cx.beginPath(); cx.arc(W-W*0.05-i*W*0.065, H*0.048, H*0.016, 0, Math.PI*2); cx.fill();
-    cx.restore();
+    cx.shadowBlur  = i<lives ? 10 : 0;
+    cx.globalCompositeOperation = i<lives ? 'lighter' : 'source-over';
+    cx.fillText('♥', W-W*0.04-i*W*0.052, H*0.048);
   }
+  cx.restore();
 
   // ── FULL CODE TABLE ─────────────────────────
   const ty    = H*0.085;   // table top y
@@ -1035,8 +1075,8 @@ function onTap(ex,ey){
 function doMenuAction(a){
   switch(a){
     case 'run':
-      dyingTimer=false;
-      score=0; lives=3; blocks=[]; particles=[]; specials=[]; dustParts=[];
+      deathFrame=-1; hearts=[]; heartT=0;
+      score=0; lives=MAX_LIVES; blocks=[]; particles=[]; specials=[]; dustParts=[];
       spawnT=0; spawnI=80; specT=0; frame=0; transitioning=false; runSpeed=3.5;
       worldIdx=rndI(WORLDS.length);
       initBgDots(); P.reset(); screen='runner'; break;
@@ -1091,11 +1131,18 @@ function loop(){
       drawWorld();
       updateSpecials(); drawSpecialObjects();
       updateDust(); drawDust();
-      P.update(); updateBlocks();
-      blocks.forEach(drawBlock);
+      P.update(); updateBlocks(); updateHearts();
+      blocks.forEach(drawBlock); drawHearts();
       P.draw();
       updateParticles(); drawParticles();
       drawHUD();
+      // death flash + transition (no setTimeout — pure frame counter)
+      if(deathFrame>=0){
+        const flashA = Math.max(0, 0.55*(1-deathFrame/20));
+        cx.fillStyle=`rgba(255,0,0,${flashA})`; cx.fillRect(0,0,W,H);
+        deathFrame++;
+        if(deathFrame>=20){ screen='gameover'; deathFrame=-1; }
+      }
       break;
     case 'gameover':
       drawGameOver();
