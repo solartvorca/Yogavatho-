@@ -192,20 +192,23 @@ const P = {
     cx.fillStyle=gr; cx.beginPath(); cx.arc(this.x,this.y,this.r*(2.5+this.glow*1.5),0,Math.PI*2); cx.fill();
     cx.restore();
 
-    // core — slight bob when running
+    // core — player takes the shape of the target block
     const bobY = this.onGround ? Math.sin(this.runStep)*2.5 : 0;
+    const info = LETTER_MAP[this.letter] || {code:1, shape:0};
+    const sh   = info.shape;
+    const py   = this.y + bobY;
     cx.save();
-    cx.shadowColor=col; cx.shadowBlur=20;
-    cx.fillStyle='#ffffff';
-    cx.beginPath(); cx.arc(this.x, this.y+bobY, this.r, 0, Math.PI*2); cx.fill();
+    cx.shadowColor=col; cx.shadowBlur=28;
+    drawShape(sh, this.x, py, this.r, '#ffffff', col);
     cx.restore();
 
-    // letter
+    // code number (same as on the target block — visual match)
     cx.save();
-    cx.font = pxFont(this.r*1.1);
-    cx.fillStyle='#0a0a1a';
+    cx.font=pxFont(this.r*0.95);
+    cx.fillStyle=col;
+    cx.shadowColor=col; cx.shadowBlur=6;
     cx.textAlign='center'; cx.textBaseline='middle';
-    cx.fillText(this.letter, this.x, this.y+bobY+1);
+    cx.fillText(info.code, this.x, py+1);
     cx.restore();
   }
 };
@@ -223,7 +226,9 @@ function spawnBlock(){
   const y       = elevated ? GY - sz - H*0.22 : GY - sz;
   const spd     = runSpeed;
 
-  blocks.push({ x:W+sz, y, sz, code, isObs, isRight, spd, shape:rndI(4), done:false });
+  const playerShape = LETTER_MAP[P.letter]?.shape || 0;
+  const shape = isRight ? playerShape : rndI(4);
+  blocks.push({ x:W+sz, y, sz, code, isObs, isRight, spd, shape, done:false });
 }
 
 function updateBlocks(){
