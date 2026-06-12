@@ -306,7 +306,8 @@
             box-sizing: border-box;
             background: linear-gradient(180deg, rgba(26,10,46,0.5) 0%, transparent 100%);
             contain: layout;
-            overflow-y: auto;
+            overflow: hidden;
+            width: 100%;
         }
 
         #numpad-zone {
@@ -1336,17 +1337,50 @@ function renderGame() {
 
 function renderMeditationMode() {
     const p = meditationPhrases[phraseIdx % meditationPhrases.length];
-    let h = '<div style="font-size:1.3rem; letter-spacing:3px;">';
     let letterIndex = 0;
+    let currentLetter = '';
+    let currentCode = '';
+
+    // Find current target letter and its code
+    for (let i = 0; i < p.length; i++) {
+        if (p[i] !== ' ') {
+            if (letterIndex === charIdx) {
+                currentLetter = p[i];
+                currentCode = letterMap[p[i]] ? letterMap[p[i]].code : '?';
+                break;
+            }
+            letterIndex++;
+        }
+    }
+
+    letterIndex = 0;
+    let h = '<div style="font-size:1.1rem; letter-spacing:2px; display:flex; flex-wrap:wrap; justify-content:center; width:100%; row-gap:6px;">';
     for (let i = 0; i < p.length; i++) {
         const char = p[i];
         const isSpace = char === ' ';
-        const color = isSpace ? 'transparent' : (letterIndex < charIdx ? 'var(--correct)' : 'rgba(255,236,139,0.25)');
-        const displayChar = isSpace ? '&nbsp;' : char;
-        h += `<span style="color:${color}; transition:color 0.3s; ${isSpace ? 'margin:0 8px;' : ''}">${displayChar}</span>`;
+        let style = 'transition:color 0.3s;';
+        let color;
+        if (isSpace) {
+            color = 'transparent';
+            style += 'width:0.6em; display:inline-block;';
+        } else if (letterIndex < charIdx) {
+            color = 'var(--correct)';
+        } else if (letterIndex === charIdx) {
+            color = 'var(--gold)';
+            style += 'font-weight:700; text-shadow:0 0 15px var(--glow-gold); text-decoration:underline;';
+        } else {
+            color = 'rgba(255,236,139,0.25)';
+        }
+        h += `<span style="color:${color}; ${style}">${isSpace ? ' ' : char}</span>`;
         if (!isSpace) letterIndex++;
     }
-    DOM.taskContent.innerHTML = `<div class="mode-desc">МЕДИТАЦИЯ: Вспомни код каждой буквы.</div>` + h + '</div>';
+    h += '</div>';
+
+    const hint = currentLetter
+        ? `<div style="margin-top:10px; font-size:0.85rem; color:var(--amber); letter-spacing:2px;">Буква <b style="color:var(--gold)">${currentLetter}</b> → код <b style="color:var(--gold)">${currentCode}</b></div>`
+        : '';
+
+    DOM.taskContent.innerHTML = `<div class="mode-desc">МЕДИТАЦИЯ: Вспомни код каждой буквы.</div>` + h + hint;
     drawNumpad(true);
 }
 
