@@ -211,7 +211,7 @@ function spawnBlock(){
   const tCode   = LETTER_MAP[P.letter]?.code || 1;
   const code    = isObs ? 0 : (Math.random()<0.38 ? tCode : rndI(9)+1);
   const isRight = !isObs && code === tCode;
-  const sz      = 38 + rndI(20);
+  const sz      = Math.round(H * 0.085) + rndI(Math.round(H * 0.04));
   const elevated= !isObs && Math.random()<0.3;
   const y       = elevated ? GY - sz - H*0.22 : GY - sz;
   const spd     = runSpeed;
@@ -487,6 +487,17 @@ function drawHUD(){
     cx.textAlign='center'; cx.fillText('TAP / ПРОБЕЛ → ПРЫЖОК', W/2, H*0.92);
     cx.restore();
   }
+
+  // restart button in HUD
+  const rbw=H*0.1, rbh=H*0.065, rbx=W*0.03, rby=H*0.88;
+  hudRestartRect={x:rbx,y:rby,w:rbw,h:rbh};
+  cx.save();
+  cx.fillStyle='rgba(255,100,100,0.12)'; cx.strokeStyle='rgba(255,100,100,0.5)'; cx.lineWidth=1.5;
+  roundRect(rbx,rby,rbw,rbh,rbh/2); cx.fill(); cx.stroke();
+  cx.font=pxFont(H*0.03); cx.fillStyle='rgba(255,160,160,0.85)';
+  cx.textAlign='center'; cx.textBaseline='middle';
+  cx.fillText('↺',rbx+rbw/2,rby+rbh/2);
+  cx.restore();
 }
 
 // ═══════════════════════════════════════════
@@ -816,20 +827,37 @@ function drawGameOver(){
   cx.font=pxFont(H*0.068); cx.fillStyle='#ff6b9d';
   cx.textAlign='center'; cx.textBaseline='middle';
   cx.shadowColor='#ff6b9d'; cx.shadowBlur=35;
-  cx.fillText('ИГРА ОКОНЧЕНА',W/2,H*0.22);
-  cx.font=pxFont(H*0.115); cx.fillStyle='#ffd700';
-  cx.shadowColor='#ffd700'; cx.fillText(score,W/2,H*0.42);
+  cx.fillText('ИГРА ОКОНЧЕНА',W/2,H*0.2);
+  cx.font=pxFont(H*0.13); cx.fillStyle='#ffd700';
+  cx.shadowColor='#ffd700'; cx.shadowBlur=45;
+  cx.fillText(score,W/2,H*0.4);
   cx.font=pxFont(H*0.025); cx.fillStyle='rgba(255,215,0,0.55)'; cx.shadowBlur=0;
-  cx.fillText('РЕКОРД: '+hiScore,W/2,H*0.555);
+  cx.fillText('РЕКОРД: '+hiScore,W/2,H*0.53);
   cx.restore();
-  menuBtn('↺  ЗАНОВО',W/2,H*0.68,'run');
-  menuBtn('◀  МЕНЮ',W/2,H*0.79,'menu');
+
+  // pulsing tap-to-restart prompt (like dino game)
+  const pulse = 0.6 + Math.sin(frame*0.08)*0.4;
+  cx.save();
+  cx.globalAlpha=pulse;
+  cx.font=pxFont(H*0.036); cx.fillStyle='#ffffff';
+  cx.textAlign='center'; cx.textBaseline='middle';
+  cx.shadowColor='#ffffff'; cx.shadowBlur=20;
+  cx.fillText('↺  КОСНИСЬ ЧТОБЫ ИГРАТЬ СНОВА',W/2,H*0.69);
+  cx.restore();
+
+  // small menu link at bottom
+  cx.save();
+  cx.font=pxFont(H*0.018); cx.fillStyle='rgba(255,215,0,0.3)';
+  cx.textAlign='center'; cx.fillText('← меню',W/2,H*0.92);
+  menuBtns.push({x:W*0.3,y:H*0.88,w:W*0.4,h:H*0.07,a:'menu'});
+  cx.restore();
 }
 
 // ═══════════════════════════════════════════
 //  BACK BUTTON
 // ═══════════════════════════════════════════
 let backBtnRect={x:0,y:0,w:0,h:0};
+let hudRestartRect={x:0,y:0,w:0,h:0};
 function backBtn(){
   const bw=W*0.26, bh=H*0.055, bx=W*0.04, by=H-H*0.08;
   backBtnRect={x:bx,y:by,w:bw,h:bh};
@@ -858,9 +886,17 @@ function toCanvas(ex,ey){
 function onTap(ex,ey){
   const [x,y]=toCanvas(ex,ey);
 
-  if(screen==='runner'){ P.jump(); return; }
+  if(screen==='runner'){
+    const r=hudRestartRect;
+    if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h){ doMenuAction('run'); return; }
+    P.jump(); return;
+  }
 
-  if(screen==='menu'||screen==='gameover'){
+  if(screen==='gameover'){
+    doMenuAction('run'); return;
+  }
+
+  if(screen==='menu'){
     menuBtns.forEach(b=>{
       if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h) doMenuAction(b.a);
     });
@@ -932,6 +968,7 @@ document.addEventListener('keydown', e=>{
   if(e.code==='Space'||e.code==='ArrowUp'){
     e.preventDefault();
     if(screen==='runner') P.jump();
+    else if(screen==='gameover') doMenuAction('run');
   }
 });
 
