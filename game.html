@@ -518,18 +518,18 @@ function drawHUD(){
 
   // ── FULL CODE TABLE ─────────────────────────
   const ty    = H*0.085;   // table top y
-  const th    = H*0.082;   // table height
+  const th    = H*0.12;    // table height
   const cellW = W / 9;
 
   cx.save();
-  // strip background
-  cx.fillStyle='rgba(0,0,12,0.6)';
-  cx.fillRect(0, ty - H*0.006, W, th + H*0.025);
+  // darker background strip
+  cx.fillStyle='rgba(0,0,18,0.85)';
+  cx.fillRect(0, ty - H*0.01, W, th + H*0.032);
 
-  // "твоя буква → ищи код:" label
-  cx.font=pxFont(H*0.014); cx.fillStyle='rgba(255,255,255,0.4)';
+  // label above table
+  cx.font=pxFont(H*0.017); cx.fillStyle='rgba(255,255,255,0.75)';
   cx.textAlign='center'; cx.textBaseline='bottom';
-  cx.fillText('ТВОЯ БУКВА  '+P.letter+'  →  ИЩЕШЬ КОД  '+lc, W/2, ty - H*0.008);
+  cx.fillText('ТВОЯ БУКВА  ' + P.letter + '  →  ИЩЕШЬ КОД  ' + lc, W/2, ty - H*0.012);
 
   for(let code=1; code<=9; code++){
     const ccx      = (code - 0.5) * cellW;
@@ -537,27 +537,27 @@ function drawHUD(){
     const acol     = CODE_COLOR[code];
 
     if(isTarget){
-      // highlighted cell
-      cx.fillStyle = acol + '2e';
-      roundRect(ccx - cellW*0.46, ty - H*0.002, cellW*0.92, th + H*0.004, 7);
+      // highlighted cell background + border
+      cx.fillStyle = acol + '38';
+      roundRect(ccx - cellW*0.47, ty - H*0.005, cellW*0.94, th + H*0.01, 9);
       cx.fill();
-      cx.strokeStyle=acol; cx.lineWidth=1.5; cx.stroke();
-      cx.shadowColor=acol; cx.shadowBlur=16;
+      cx.strokeStyle=acol; cx.lineWidth=2; cx.stroke();
+      cx.shadowColor=acol; cx.shadowBlur=22;
     } else {
       cx.shadowBlur=0;
     }
 
-    // code digit
-    cx.font=pxFont(isTarget ? H*0.04 : H*0.026);
-    cx.fillStyle = isTarget ? acol : 'rgba(255,215,0,0.3)';
+    // code digit — each column uses its own code color
+    cx.font=pxFont(isTarget ? H*0.048 : H*0.034);
+    cx.fillStyle = isTarget ? acol : acol+'cc';
     cx.textAlign='center'; cx.textBaseline='top';
-    cx.fillText(code, ccx, ty + H*0.005);
+    cx.fillText(code, ccx, ty + H*0.007);
 
     // letters below digit
     cx.shadowBlur=0;
-    cx.font=pxFont(isTarget ? H*0.016 : H*0.012);
-    cx.fillStyle = isTarget ? '#ffffff' : 'rgba(255,255,255,0.2)';
-    cx.fillText(CODE_LETTERS[code].join(''), ccx, ty + H*0.047);
+    cx.font=pxFont(isTarget ? H*0.021 : H*0.018);
+    cx.fillStyle = isTarget ? '#ffffff' : 'rgba(255,255,255,0.65)';
+    cx.fillText(CODE_LETTERS[code].join(''), ccx, ty + H*0.062);
   }
   cx.restore();
 
