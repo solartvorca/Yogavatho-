@@ -202,13 +202,13 @@ const P = {
     drawShape(sh, this.x, py, this.r, '#ffffff', col);
     cx.restore();
 
-    // code number (same as on the target block — visual match)
+    // letter on the player
     cx.save();
     cx.font=pxFont(this.r*0.95);
     cx.fillStyle=col;
     cx.shadowColor=col; cx.shadowBlur=6;
     cx.textAlign='center'; cx.textBaseline='middle';
-    cx.fillText(info.code, this.x, py+1);
+    cx.fillText(this.letter, this.x, py+1);
     cx.restore();
   }
 };
