@@ -1125,6 +1125,7 @@ const wordWeightPhrases = [
 let letterMap = {};
 let prana = 0;
 let mode = 0, currentInput = "", targetVal = 0, phraseIdx = 0, charIdx = 0, isProcessing = false;
+let meditationHintsLeft = 3;
 let sensoryEnabled = false, reverseMode = false;
 let breathTimeout = null;
 let breathCount = 0;
@@ -1302,7 +1303,7 @@ function startMode(m) {
 
     DOM.loadTextBtn.style.display = (mode === 1) ? 'block' : 'none';
 
-    if (mode === 4) phraseIdx = 0;
+    if (mode === 4) { phraseIdx = 0; meditationHintsLeft = 3; }
     if (mode === 5) initT9();
 
     document.querySelectorAll('.nav-menu button').forEach(btn => btn.classList.remove('active'));
@@ -1377,12 +1378,29 @@ function renderMeditationMode() {
     }
     h += '</div>';
 
-    const hint = currentLetter
-        ? `<div style="margin-top:10px; font-size:0.85rem; color:var(--amber); letter-spacing:2px;">Буква <b style="color:var(--gold)">${currentLetter}</b> → код <b style="color:var(--gold)">${currentCode}</b></div>`
-        : '';
+    let hintArea = '';
+    if (currentLetter) {
+        if (meditationHintsLeft > 0) {
+            hintArea = `<button onclick="showMeditationHint()" style="margin-top:12px; background:none; border:1px solid rgba(255,236,139,0.35); border-radius:20px; padding:5px 16px; color:rgba(255,236,139,0.6); font-size:0.8rem; letter-spacing:1px; cursor:pointer;">? подсказка (${meditationHintsLeft})</button><div id="hint-reveal" style="display:none; margin-top:8px; font-size:0.85rem; color:var(--amber); letter-spacing:2px;">Буква <b style="color:var(--gold)">${currentLetter}</b> → код <b style="color:var(--gold)">${currentCode}</b></div>`;
+        } else {
+            hintArea = `<div style="margin-top:12px; font-size:0.75rem; color:rgba(255,236,139,0.25); letter-spacing:1px;">подсказки использованы</div>`;
+        }
+    }
 
-    DOM.taskContent.innerHTML = `<div class="mode-desc">МЕДИТАЦИЯ: Вспомни код каждой буквы.</div>` + h + hint;
+    DOM.taskContent.innerHTML = `<div class="mode-desc">МЕДИТАЦИЯ: Вспомни код каждой буквы.</div>` + h + hintArea;
     drawNumpad(true);
+}
+
+function showMeditationHint() {
+    if (meditationHintsLeft <= 0) return;
+    meditationHintsLeft--;
+    const reveal = document.getElementById('hint-reveal');
+    if (reveal) {
+        reveal.style.display = 'block';
+        const btn = reveal.previousElementSibling;
+        if (btn) btn.style.display = 'none';
+        setTimeout(() => renderMeditationMode(), 2500);
+    }
 }
 
 function renderSymbolMode() {
