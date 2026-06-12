@@ -371,7 +371,8 @@ function drawParticles(){
   particles.forEach(p=>{
     cx.save(); cx.globalAlpha=p.a; cx.globalCompositeOperation='lighter';
     cx.fillStyle=p.col;
-    cx.beginPath(); cx.arc(p.x,p.y,p.sz*p.a,0,Math.PI*2); cx.fill();
+    const pr = p.sz*p.a; if(pr<=0){ cx.restore(); return; }
+    cx.beginPath(); cx.arc(p.x,p.y,pr,0,Math.PI*2); cx.fill();
     cx.restore();
   });
 }
