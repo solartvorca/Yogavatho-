@@ -2,1176 +2,1146 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0a0a1a">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Нейро-Код: Точка Света</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;background:#0a0a1a;overflow:hidden;touch-action:none}
-canvas{display:block;width:100%;height:100%}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    color-scheme: dark;
+    overflow: hidden;
+    font-family: monospace;
+    font-weight: bold;
+    touch-action: none;
+  }
+  canvas { display: block; }
 </style>
+<base target="_blank">
 </head>
 <body>
 <canvas id="c"></canvas>
 <script>
-// ═══════════════════════════════════════════
-//  ДАННЫЕ
-// ═══════════════════════════════════════════
-const CODE_LETTERS = {
-  1:['И','С','Э'], 2:['А','Й','П','Т'], 3:['Б','З','М','Ю'],
-  4:['В','К','Ф','Я'], 5:['Д','Л','Х','Ы'], 6:['Е','О','Ц','Ь'],
-  7:['Ё','Н','Ъ'], 8:['Г','У','Ч','Щ'], 9:['Ж','Р','Ш']
+// ==================== КОНФИГУРАЦИЯ ====================
+const CODE_GROUPS = {
+  1: ['И','С','Э'],
+  2: ['А','Й','П','Т'],
+  3: ['Б','З','М','Ю'],
+  4: ['В','К','Ф','Я'],
+  5: ['Д','Л','Х','Ы'],
+  6: ['Е','О','Ц','Ь'],
+  7: ['Ё','Н','Ъ'],
+  8: ['Г','У','Ч','Щ'],
+  9: ['Ж','Р','Ш']
 };
+
 const CODE_COLOR = {
-  1:'#4fc3f7',2:'#ffd700',3:'#81c784',4:'#4db6ac',
-  5:'#64b5f6',6:'#a5d6a7',7:'#ce93d8',8:'#ffcc02',9:'#ff8a65'
+  1: '#00d4ff', 2: '#ffd700', 3: '#00ff66',
+  4: '#00e5ff', 5: '#3366ff', 6: '#88ff88',
+  7: '#cc66ff', 8: '#ffdd00', 9: '#ff8800'
 };
-const LETTER_MAP = {};
-Object.entries(CODE_LETTERS).forEach(([c,ls])=>
-  ls.forEach((l,i)=>{ LETTER_MAP[l]={code:+c, shape:i%4}; }));
-const ALL_LETTERS = Object.keys(LETTER_MAP);
 
-const WORLDS = [
-  {name:'ПУСТЫНЯ',   sky:'#1a0800', gnd:'#6b3a0f', top:'#c4621a', acc:'#ff8c00', ptc:'#ffcc88'},
-  {name:'ЛЕС',       sky:'#001408', gnd:'#1a3a0a', top:'#2d6b1a', acc:'#44ff88', ptc:'#88ffaa'},
-  {name:'ПОДВОДНЫЙ', sky:'#000c1e', gnd:'#003', top:'#0044aa',    acc:'#00d4ff', ptc:'#44aaff'},
-  {name:'ОБЛАКА',    sky:'#6ab0d4', gnd:'#c8e8ff', top:'#ffffff',  acc:'#ffd700', ptc:'#ffffff'},
-  {name:'ПОДЗЕМЕЛЬЕ',sky:'#080008', gnd:'#1a0028', top:'#3a0050',  acc:'#8b5cf6', ptc:'#cc88ff'}
-];
+const SHAPE_NAMES = ['круг', 'квадрат', 'треугольник', 'ромб'];
+const SHAPES = ['circle', 'roundRect', 'triangle', 'diamond'];
 
-// ═══════════════════════════════════════════
-//  CANVAS
-// ═══════════════════════════════════════════
-const cv = document.getElementById('c');
-const cx = cv.getContext('2d');
-let W=0, H=0, GY=0;
+function getLetterCode(letter) {
+  for (let code in CODE_GROUPS) {
+    const idx = CODE_GROUPS[code].indexOf(letter);
+    if (idx !== -1) return { code: parseInt(code), shapeIdx: idx % 4, letter };
+  }
+  return null;
+}
 
-function resize(){
-  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+function getRandomLetter() {
+  const codes = Object.keys(CODE_GROUPS);
+  const code = codes[Math.floor(Math.random() * codes.length)];
+  const group = CODE_GROUPS[code];
+  const letter = group[Math.floor(Math.random() * group.length)];
+  return getLetterCode(letter);
+}
+
+function getRandomLetterFromCode(code) {
+  const group = CODE_GROUPS[code];
+  return group[Math.floor(Math.random() * group.length)];
+}
+
+// ==================== CANVAS ====================
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, DPR;
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
   W = window.innerWidth;
   H = window.innerHeight;
-  cv.width  = Math.round(W * DPR);
-  cv.height = Math.round(H * DPR);
-  cv.style.width  = W + 'px';
-  cv.style.height = H + 'px';
-  cx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  GY = H * 0.76;
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 window.addEventListener('resize', resize);
 resize();
 
-// ═══════════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════════
-let screen = 'menu'; // menu | quiz-select | quiz | runner | gameover | ref
-let frame  = 0;
-let hiScore = +localStorage.getItem('nk_hi') || 0;
-
-// runner
-const MAX_LIVES = 5;
-let score=0, lives=MAX_LIVES, worldIdx=0;
-let blocks=[], particles=[], bgDots=[], specials=[], dustParts=[];
-let hearts=[], heartT=0;
-let spawnT=0, spawnI=80, specT=0;
-let transitioning=false, transTimer=0, transName='';
-let runSpeed=4;
-let deathFrame=-1; // -1=alive, 0+=dying (counts up to 20, then gameover)
-
-const SPEED_STEPS  = [0.6, 1, 1.6, 2.4, 3.5];
-const SPEED_LABELS = ['0.6×', '1×', '1.6×', '2.4×', '3.5×'];
+// ==================== СОСТОЯНИЕ ====================
+let screen = 'menu'; // menu, difficulty, runner, quiz, help, gameover
+let frame = 0;
+let score = 0;
+let hiScore = parseInt(localStorage.getItem('nk_hi') || '0');
+let lives = 5;
+let deathFrame = 0;
+let currentLetter = getRandomLetter();
 let speedIdx = 2;
+const SPEED_STEPS = [0.6, 1.0, 1.6, 2.4, 3.5];
+let runStep = 0;
+let worldIdx = 0;
+let transitionFrame = 0;
+let transitionTarget = -1;
+let showHint = true;
+let hintTimer = 0;
+let difficulty = 1; // 1=цифры, 2=буквы, 3=цифра→буква
 
-// quiz
-let qDiff=1, qScore=0, qStreak=0;
-let qQuestion=null, qResult=null, qResultT=0;
+// Миры
+const WORLDS = [
+  { name: 'ПУСТЫНЯ', sky: '#1a0f00', ground: '#3d2205', ground2: '#5c3a0a', particles: '#ffaa44' },
+  { name: 'ЛЕС', sky: '#0a1a0a', ground: '#1a3d1a', ground2: '#2d5c2d', particles: '#88ff88' },
+  { name: 'ПОДВОДНЫЙ', sky: '#000a1a', ground: '#001a33', ground2: '#002a4d', particles: '#00ccff' },
+  { name: 'ОБЛАКА', sky: '#0a1a2a', ground: '#1a2a3a', ground2: '#2a3a4a', particles: '#aaccff' },
+  { name: 'ПОДЗЕМЕЛЬЕ', sky: '#0a0a0a', ground: '#1a0a1a', ground2: '#2a0a2a', particles: '#cc66ff' }
+];
 
-// ═══════════════════════════════════════════
-//  HELPERS
-// ═══════════════════════════════════════════
-const rnd  = n => Math.random()*n;
-const rndI = n => Math.floor(Math.random()*n);
-const rndL = ()=> ALL_LETTERS[rndI(ALL_LETTERS.length)];
-function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=rndI(i+1);[a[i],a[j]]=[a[j],a[i]];} return a; }
-
-function pxFont(size){ return `bold ${size}px monospace`; }
-
-function roundRect(x,y,w,h,r){
-  cx.beginPath();
-  if(cx.roundRect){ cx.roundRect(x,y,w,h,r); }
-  else{
-    cx.moveTo(x+r,y); cx.lineTo(x+w-r,y);
-    cx.arcTo(x+w,y,x+w,y+r,r); cx.lineTo(x+w,y+h-r);
-    cx.arcTo(x+w,y+h,x+w-r,y+h,r); cx.lineTo(x+r,y+h);
-    cx.arcTo(x,y+h,x,y+h-r,r); cx.lineTo(x,y+r);
-    cx.arcTo(x,y,x+r,y,r); cx.closePath();
-  }
-}
-
-function drawShape(shape,px,py,r,fill,stroke){
-  cx.beginPath();
-  switch(shape){
-    case 0: cx.arc(px,py,r,0,Math.PI*2); break;
-    case 1: cx.rect(px-r,py-r,r*2,r*2); break;
-    case 2: cx.moveTo(px,py-r); cx.lineTo(px+r,py+r); cx.lineTo(px-r,py+r); cx.closePath(); break;
-    case 3: cx.moveTo(px,py-r); cx.lineTo(px+r,py); cx.lineTo(px,py+r); cx.lineTo(px-r,py); cx.closePath(); break;
-  }
-  if(fill){ cx.fillStyle=fill; cx.fill(); }
-  if(stroke){ cx.strokeStyle=stroke; cx.lineWidth=2; cx.stroke(); }
-}
-
-// ═══════════════════════════════════════════
-//  PLAYER — точка света
-// ═══════════════════════════════════════════
-const P = {
-  x:0, y:0, vy:0, r:18,
-  letter:'А', jumps:0,
-  trail:[], glow:0, flash:0,
-  onGround:true, runStep:0,
-
-  reset(){
-    this.x = W*0.2; this.y = GY - this.r;
-    this.vy=0; this.jumps=0; this.trail=[];
-    this.glow=0; this.flash=0; this.runStep=0;
-    this.letter = rndL();
-  },
-
-  jump(){
-    if(this.jumps < 2){ this.vy = -H*0.021; this.jumps++; }
-  },
-
-  update(){
-    this.vy += H*0.0011;
-    this.y  += this.vy;
-    const prevGround = this.onGround;
-    if(this.y >= GY - this.r){
-      this.y = GY-this.r; this.vy=0; this.jumps=0; this.onGround=true;
-    } else { this.onGround=false; }
-
-    // running bob when on ground
-    if(this.onGround){
-      this.runStep += 0.22;
-      // dust every half-step
-      if(Math.floor(this.runStep)%2===0 && rnd(1)<0.3){
-        dustParts.push({x:this.x-this.r,y:GY,vx:-rnd(2)-0.5,vy:-rnd(1.5)-0.5,a:0.7,sz:rnd(3)+1});
-      }
-    }
-
-    // push trail from slightly behind (creates forward-motion illusion)
-    const trailX = this.x - this.r*0.5;
-    const trailY = this.onGround ? this.y + Math.sin(this.runStep)*2 : this.y;
-    this.trail.push({x:trailX, y:trailY, a:1});
-    if(this.trail.length > 18) this.trail.shift();
-    this.trail.forEach(t=>t.a -= 0.055);
-    if(this.glow > 0) this.glow -= 0.04;
-    if(this.flash > 0) this.flash -= 0.08;
-  },
-
-  draw(){
-    const col = this.flash>0 ? '#ff4444' : CODE_COLOR[LETTER_MAP[this.letter]?.code||1];
-
-    // speed lines — show forward motion
-    cx.save(); cx.globalAlpha=0.18; cx.strokeStyle=col; cx.lineWidth=1.5;
-    for(let i=0;i<5;i++){
-      const lx = this.x - this.r*2 - i*12;
-      const ly = this.y - 4 + i*2;
-      cx.beginPath(); cx.moveTo(lx,ly); cx.lineTo(lx-18-i*4,ly); cx.stroke();
-    }
-    cx.restore();
-
-    // trail (elongated to the left = running right)
-    this.trail.forEach((t,i)=>{
-      if(t.a<=0) return;
-      cx.save(); cx.globalAlpha = t.a*0.4;
-      cx.globalCompositeOperation='lighter';
-      cx.fillStyle = col;
-      cx.beginPath(); cx.arc(t.x,t.y,Math.max(0.01,this.r*t.a*0.65),0,Math.PI*2); cx.fill();
-      cx.restore();
-    });
-
-    // outer glow
-    cx.save(); cx.globalCompositeOperation='lighter';
-    const gr = cx.createRadialGradient(this.x,this.y,0,this.x,this.y,this.r*(2.5+this.glow*1.5));
-    gr.addColorStop(0, col+'bb'); gr.addColorStop(0.5, col+'44'); gr.addColorStop(1,'transparent');
-    cx.fillStyle=gr; cx.beginPath(); cx.arc(this.x,this.y,this.r*(2.5+this.glow*1.5),0,Math.PI*2); cx.fill();
-    cx.restore();
-
-    // core — player takes the shape of the target block
-    const bobY = this.onGround ? Math.sin(this.runStep)*2.5 : 0;
-    const info = LETTER_MAP[this.letter] || {code:1, shape:0};
-    const sh   = info.shape;
-    const py   = this.y + bobY;
-    cx.save();
-    cx.shadowColor=col; cx.shadowBlur=28;
-    drawShape(sh, this.x, py, this.r, '#ffffff', col);
-    cx.restore();
-
-    // letter on the player — dark absorbing halo for contrast
-    cx.save();
-    // dark circle behind the letter absorbs light from the shape
-    cx.globalCompositeOperation='multiply';
-    cx.fillStyle='rgba(0,0,0,0.72)';
-    cx.beginPath(); cx.arc(this.x, py, this.r*0.72, 0, Math.PI*2); cx.fill();
-    cx.globalCompositeOperation='source-over';
-    cx.font=pxFont(this.r*1.05);
-    cx.fillStyle='#ffffff';
-    cx.textAlign='center'; cx.textBaseline='middle';
-    cx.shadowColor='#000000'; cx.shadowBlur=0;
-    cx.fillText(this.letter, this.x, py+1);
-    cx.restore();
-  }
+// Игрок (раннер)
+let player = {
+  x: 0, y: 0, vy: 0, onGround: true, jumps: 0,
+  trail: [], flashRed: 0
 };
 
-// ═══════════════════════════════════════════
-//  BLOCKS
-// ═══════════════════════════════════════════
-function spawnBlock(){
-  const isObs   = Math.random() < 0.22;
-  const tCode   = LETTER_MAP[P.letter]?.code || 1;
-  const code    = isObs ? 0 : (Math.random()<0.38 ? tCode : rndI(9)+1);
-  const isRight = !isObs && code === tCode;
-  const sz      = Math.round(H * 0.085) + rndI(Math.round(H * 0.04));
-  const elevated= !isObs && Math.random()<0.3;
-  const y       = elevated ? GY - sz - H*0.22 : GY - sz;
-  const spd     = runSpeed;
+// Объекты
+let blocks = [];
+let particles = [];
+let hearts = [];
+let orbs = [];
+let lastSpawn = 0;
+let spawnInterval = 120;
+let heartSpawnTimer = 0;
+let heartSpawnNext = 300 + Math.random() * 200;
 
-  const playerShape = LETTER_MAP[P.letter]?.shape || 0;
-  const shape = isRight ? playerShape : rndI(4);
-  blocks.push({ x:W+sz, y, sz, code, isObs, isRight, spd, shape, done:false });
+// Квиз
+let quizLevel = 1;
+let quizQuestion = null;
+let quizAnswered = false;
+let quizWait = 0;
+let quizStreak = 0;
+let quizScore = 0;
+
+// Меню орбы
+for (let i = 0; i < 9; i++) {
+  orbs.push({
+    x: Math.random() * W, y: Math.random() * H,
+    vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+    r: 20 + Math.random() * 15,
+    code: Object.keys(CODE_GROUPS)[i],
+    phase: Math.random() * Math.PI * 2
+  });
 }
 
-function updateBlocks(){
-  if(deathFrame>=0) return; // don't process collisions while dying
-  spawnT++;
-  if(spawnT >= spawnI){ spawnT=0; spawnBlock(); spawnI=Math.max(22, Math.round((80-score*1.2)/SPEED_STEPS[speedIdx])); }
-  blocks = blocks.filter(b=>b.x > -b.sz*2);
+// ==================== УТИЛИТЫ ====================
+function drawShape(x, y, size, shape, color, glow) {
+  ctx.save();
+  ctx.fillStyle = color;
+  if (glow) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = glow;
+  }
+  ctx.beginPath();
+  if (shape === 'circle') {
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+  } else if (shape === 'roundRect') {
+    const r = size * 0.3;
+    ctx.moveTo(x - size + r, y - size);
+    ctx.lineTo(x + size - r, y - size);
+    ctx.quadraticCurveTo(x + size, y - size, x + size, y - size + r);
+    ctx.lineTo(x + size, y + size - r);
+    ctx.quadraticCurveTo(x + size, y + size, x + size - r, y + size);
+    ctx.lineTo(x - size + r, y + size);
+    ctx.quadraticCurveTo(x - size, y + size, x - size, y + size - r);
+    ctx.lineTo(x - size, y - size + r);
+    ctx.quadraticCurveTo(x - size, y - size, x - size + r, y - size);
+  } else if (shape === 'triangle') {
+    ctx.moveTo(x, y - size);
+    ctx.lineTo(x + size * 0.866, y + size * 0.5);
+    ctx.lineTo(x - size * 0.866, y + size * 0.5);
+  } else if (shape === 'diamond') {
+    ctx.moveTo(x, y - size);
+    ctx.lineTo(x + size * 0.7, y);
+    ctx.lineTo(x, y + size);
+    ctx.lineTo(x - size * 0.7, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
 
-  blocks.forEach(b=>{
-    b.x -= b.spd;
-    if(b.done) return;
-    const dist = Math.hypot(P.x-(b.x+b.sz/2), P.y-(b.y+b.sz/2));
-    if(dist < P.r + b.sz*0.48){
-      b.done=true;
-      if(b.isRight){
-        score++;
-        P.glow=1.2;
-        addParticles(P.x,P.y,CODE_COLOR[b.code],14);
-        P.letter = rndL();
-        if(score > hiScore){ hiScore=score; localStorage.setItem('nk_hi',hiScore); }
+function drawText(text, x, y, size, color, align, glow) {
+  ctx.save();
+  ctx.font = 'bold ' + size + 'px monospace';
+  ctx.textAlign = align || 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = color;
+  if (glow) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = glow;
+  }
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function drawButton(text, x, y, w, h, color, textColor, glow) {
+  ctx.save();
+  ctx.fillStyle = color;
+  if (glow) {
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 20;
+  }
+  ctx.beginPath();
+  const r = h * 0.2;
+  ctx.moveTo(x - w/2 + r, y - h/2);
+  ctx.lineTo(x + w/2 - r, y - h/2);
+  ctx.quadraticCurveTo(x + w/2, y - h/2, x + w/2, y - h/2 + r);
+  ctx.lineTo(x + w/2, y + h/2 - r);
+  ctx.quadraticCurveTo(x + w/2, y + h/2, x + w/2 - r, y + h/2);
+  ctx.lineTo(x - w/2 + r, y + h/2);
+  ctx.quadraticCurveTo(x - w/2, y + h/2, x - w/2, y + h/2 - r);
+  ctx.lineTo(x - w/2, y - h/2 + r);
+  ctx.quadraticCurveTo(x - w/2, y - h/2, x - w/2 + r, y - h/2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  drawText(text, x, y, h * 0.4, textColor || '#fff', 'center');
+}
+
+function isInside(px, py, x, y, w, h) {
+  return px >= x - w/2 && px <= x + w/2 && py >= y - h/2 && py <= y + h/2;
+}
+
+// ==================== ЧАСТИЦЫ ====================
+function spawnParticles(x, y, color, count, speed) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const sp = (Math.random() * 0.5 + 0.5) * speed;
+    particles.push({
+      x, y, vx: Math.cos(angle) * sp, vy: Math.sin(angle) * sp,
+      life: 1, color, size: 2 + Math.random() * 3
+    });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.15;
+    p.life -= 0.02;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (let p of particles) {
+    ctx.save();
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, Math.max(0.01, p.size * p.life), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ==================== РАННЕР ЛОГИКА ====================
+function initRunner() {
+  score = 0;
+  lives = 5;
+  blocks = [];
+  particles = [];
+  hearts = [];
+  currentLetter = getRandomLetter();
+  player.x = W * 0.2;
+  player.y = H * 0.75;
+  player.vy = 0;
+  player.onGround = true;
+  player.jumps = 0;
+  player.trail = [];
+  player.flashRed = 0;
+  runStep = 0;
+  worldIdx = 0;
+  lastSpawn = 0;
+  spawnInterval = 120;
+  heartSpawnTimer = 0;
+  heartSpawnNext = 300 + Math.random() * 200;
+  showHint = true;
+  hintTimer = frame;
+  deathFrame = 0;
+}
+
+function getPlayerDisplay() {
+  if (difficulty === 1) {
+    return { text: currentLetter.code.toString(), isDigit: true };
+  } else if (difficulty === 2) {
+    return { text: currentLetter.letter, isDigit: false };
+  } else {
+    return { text: currentLetter.code.toString(), isDigit: true };
+  }
+}
+
+function getBlockDisplay(block) {
+  if (difficulty === 1) {
+    return block.code.toString();
+  } else if (difficulty === 2) {
+    return block.letter || block.code.toString();
+  } else {
+    return block.letter || block.code.toString();
+  }
+}
+
+function spawnBlock() {
+  const speed = (W * 0.008 + score * 0.04) * SPEED_STEPS[speedIdx];
+  const baseSize = H * 0.085;
+  const sizeVar = Math.random() * H * 0.04;
+  const size = baseSize + sizeVar;
+  const isAir = Math.random() < 0.3;
+  const y = isAir ? H * 0.55 : H * 0.75;
+
+  const r = Math.random();
+  let block;
+
+  if (r < 0.38) {
+    let blockLetter;
+    if (difficulty === 2 || difficulty === 3) {
+      blockLetter = currentLetter.letter;
+    } else {
+      blockLetter = getRandomLetterFromCode(currentLetter.code);
+    }
+    block = {
+      x: W + size, y, size,
+      code: currentLetter.code,
+      letter: blockLetter,
+      shape: SHAPES[currentLetter.shapeIdx],
+      color: CODE_COLOR[currentLetter.code],
+      isCorrect: true,
+      isObs: false
+    };
+  } else if (r < 0.6) {
+    block = {
+      x: W + size, y: H * 0.75, size,
+      code: 0, letter: '', shape: 'roundRect', color: '#4a2e0a',
+      isCorrect: false, isObs: true
+    };
+  } else {
+    let wrongCode, wrongLetter, wrongShape;
+    if (difficulty === 1) {
+      wrongCode = Object.keys(CODE_GROUPS)[Math.floor(Math.random() * 9)];
+      wrongLetter = getRandomLetterFromCode(wrongCode);
+      wrongShape = Math.floor(Math.random() * 4);
+    } else {
+      const allLetters = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'.split('');
+      do {
+        wrongLetter = allLetters[Math.floor(Math.random() * allLetters.length)];
+      } while (getLetterCode(wrongLetter).code === currentLetter.code);
+      const info = getLetterCode(wrongLetter);
+      wrongCode = info.code;
+      wrongShape = info.shapeIdx;
+    }
+    block = {
+      x: W + size, y, size,
+      code: parseInt(wrongCode),
+      letter: wrongLetter,
+      shape: SHAPES[wrongShape],
+      color: CODE_COLOR[wrongCode],
+      isCorrect: false, isObs: false
+    };
+  }
+  blocks.push(block);
+}
+
+function spawnHeart() {
+  if (lives >= 5) return;
+  hearts.push({
+    x: W + 30, y: H * 0.5 + Math.random() * H * 0.2,
+    size: 15, phase: Math.random() * Math.PI * 2
+  });
+}
+
+function updateRunner() {
+  if (deathFrame > 0) {
+    deathFrame--;
+    if (deathFrame === 0) {
+      if (score > hiScore) {
+        hiScore = score;
+        localStorage.setItem('nk_hi', hiScore);
+      }
+      screen = 'gameover';
+    }
+    return;
+  }
+
+  if (transitionFrame > 0) {
+    transitionFrame--;
+    if (transitionFrame === 0 && transitionTarget >= 0) {
+      worldIdx = transitionTarget;
+      transitionTarget = -1;
+    }
+    return;
+  }
+
+  const speed = (W * 0.008 + score * 0.04) * SPEED_STEPS[speedIdx];
+  runStep += 0.15 * SPEED_STEPS[speedIdx];
+
+  player.vy += 0.6;
+  player.y += player.vy;
+
+  const groundY = H * 0.75 + Math.sin(runStep) * 2.5;
+  if (player.y >= groundY) {
+    if (!player.onGround && player.y > groundY + 5) {
+      spawnParticles(player.x, player.y + 10, '#aaa', 6, 2);
+    }
+    player.y = groundY;
+    player.vy = 0;
+    player.onGround = true;
+    player.jumps = 0;
+  } else {
+    player.onGround = false;
+  }
+
+  player.trail.push({ x: player.x, y: player.y, size: 6 });
+  if (player.trail.length > 18) player.trail.shift();
+  for (let i = 0; i < player.trail.length; i++) {
+    player.trail[i].x -= speed * 0.5;
+    player.trail[i].size *= 0.95;
+  }
+
+  lastSpawn++;
+  const currentInterval = Math.max(40, spawnInterval / SPEED_STEPS[speedIdx]);
+  if (lastSpawn > currentInterval) {
+    spawnBlock();
+    lastSpawn = 0;
+  }
+
+  heartSpawnTimer++;
+  if (heartSpawnTimer > heartSpawnNext) {
+    spawnHeart();
+    heartSpawnTimer = 0;
+    heartSpawnNext = 300 + Math.random() * 200;
+  }
+
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    let b = blocks[i];
+    b.x -= speed;
+
+    const dx = player.x - b.x;
+    const dy = player.y - b.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < b.size + 15) {
+      if (b.isObs) {
+        lives--;
+        player.flashRed = 20;
+        spawnParticles(player.x, player.y, '#ff0000', 15, 4);
+        blocks.splice(i, 1);
+        if (lives <= 0) deathFrame = 20;
+      } else if (b.isCorrect) {
+        score += 10;
+        spawnParticles(b.x, b.y, '#ffd700', 20, 5);
+        currentLetter = getRandomLetter();
+        blocks.splice(i, 1);
       } else {
         lives--;
-        P.flash=1;
-        addParticles(P.x,P.y,'#ff4444',8);
-        if(lives<=0) deathFrame=0;
+        player.flashRed = 20;
+        spawnParticles(player.x, player.y, '#ff0000', 15, 4);
+        blocks.splice(i, 1);
+        if (lives <= 0) deathFrame = 20;
+      }
+      continue;
+    }
+
+    if (b.x < -100) blocks.splice(i, 1);
+  }
+
+  for (let i = hearts.length - 1; i >= 0; i--) {
+    let h = hearts[i];
+    h.x -= speed * 0.8;
+    h.phase += 0.05;
+    h.y += Math.sin(h.phase) * 0.5;
+
+    const dx = player.x - h.x;
+    const dy = player.y - h.y;
+    if (Math.sqrt(dx*dx + dy*dy) < h.size + 20) {
+      lives = Math.min(5, lives + 1);
+      spawnParticles(h.x, h.y, '#ff69b4', 12, 3);
+      hearts.splice(i, 1);
+      continue;
+    }
+
+    if (h.x < -50) hearts.splice(i, 1);
+  }
+
+  if (showHint && frame - hintTimer > 300) {
+    showHint = false;
+  }
+
+  if (score > 0 && score % 200 === 0 && blocks.length > 0) {
+    const lastBlock = blocks[blocks.length - 1];
+    if (lastBlock.x < W * 0.5 && transitionFrame === 0) {
+      const newWorld = Math.floor(Math.random() * WORLDS.length);
+      if (newWorld !== worldIdx) {
+        transitionTarget = newWorld;
+        transitionFrame = 66;
       }
     }
-  });
-}
-
-function drawBlock(b){
-  if(b.done) return;
-  cx.save();
-  if(b.isObs){
-    cx.fillStyle='rgba(80,30,10,0.7)'; cx.strokeStyle='#8B4513'; cx.lineWidth=2;
-    roundRect(b.x,b.y,b.sz,b.sz,6); cx.fill(); cx.stroke();
-    cx.fillStyle='#cc4400'; cx.font=pxFont(b.sz*0.5);
-    cx.textAlign='center'; cx.textBaseline='middle';
-    cx.fillText('✕',b.x+b.sz/2,b.y+b.sz/2);
-  } else {
-    const col = CODE_COLOR[b.code];
-    cx.fillStyle=col+'2a'; cx.strokeStyle=col; cx.lineWidth=2;
-    cx.shadowColor=col; cx.shadowBlur=12;
-    drawShape(b.shape, b.x+b.sz/2, b.y+b.sz/2, b.sz*0.46, col+'2a', col);
-    cx.shadowBlur=0;
-    cx.fillStyle=col; cx.font=`bold ${b.sz*0.38}px monospace`;
-    cx.textAlign='center'; cx.textBaseline='middle';
-    cx.fillText(b.code, b.x+b.sz/2, b.y+b.sz/2);
   }
-  cx.restore();
 }
 
-// ═══════════════════════════════════════════
-//  SPECIALS — трамплин / водоворот
-// ═══════════════════════════════════════════
-function updateSpecials(){
-  specT++;
-  if(specT>320 && Math.random()<0.008){
-    specT=0;
-    specials.push({ x:W+40, y:GY-28, type:Math.random()<0.5?'tramp':'vortex', spd:2.4 });
-  }
-  specials = specials.filter(s=>s.x>-80);
-  specials.forEach(s=>{
-    s.x -= s.spd;
-    if(transitioning) return;
-    const dist = Math.hypot(P.x-s.x, P.y-s.y);
-    if(dist < P.r+28){
-      const next = s.type==='tramp' ? 3 : (Math.random()<0.5?2:4);
-      doTransition(next);
-      specials = specials.filter(x=>x!==s);
-    }
-  });
-}
+function drawRunner() {
+  const world = WORLDS[worldIdx];
 
-function drawSpecials(){
-  specials.forEach(s=>{
-    cx.save();
-    if(s.type==='tramp'){
-      cx.fillStyle='#ffd700'; cx.strokeStyle='#ffaa00'; cx.lineWidth=2;
-      cx.fillRect(s.x-28, s.y, 56, 10);
-      cx.strokeRect(s.x-28, s.y, 56, 10);
-      for(let i=0;i<3;i++){
-        cx.beginPath();
-        cx.moveTo(s.x-18+i*18, s.y+10);
-        cx.lineTo(s.x-18+i*18, s.y+24);
-        cx.stroke();
+  ctx.fillStyle = world.sky;
+  ctx.fillRect(0, 0, W, H);
+
+  if (worldIdx === 2) {
+    ctx.save();
+    ctx.globalAlpha = 0.1;
+    for (let i = 0; i < 5; i++) {
+      ctx.strokeStyle = '#00ccff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let x = 0; x < W; x += 20) {
+        const y = H * 0.3 + Math.sin(x * 0.01 + frame * 0.02 + i) * 30 + i * 40;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
       }
-      cx.fillStyle='#ffd700'; cx.font=pxFont(H*0.012);
-      cx.textAlign='center'; cx.fillText('▲ ОБЛАКА',s.x,s.y-6);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  if (worldIdx === 3) {
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    for (let i = 0; i < 5; i++) {
+      const cx = ((frame * 0.5 + i * 200) % (W + 200)) - 100;
+      const cy = H * 0.2 + Math.sin(i + frame * 0.01) * 50;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 40, 0, Math.PI * 2);
+      ctx.arc(cx + 30, cy - 10, 35, 0, Math.PI * 2);
+      ctx.arc(cx + 60, cy, 40, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  if (worldIdx === 4) {
+    ctx.save();
+    ctx.globalAlpha = 0.2;
+    for (let i = 0; i < 8; i++) {
+      const cx = i * W / 8 + Math.sin(frame * 0.02 + i) * 20;
+      const cy = H * 0.6;
+      ctx.fillStyle = '#cc66ff';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 40);
+      ctx.lineTo(cx + 15, cy);
+      ctx.lineTo(cx - 15, cy);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  ctx.fillStyle = world.ground;
+  ctx.fillRect(0, H * 0.75, W, H * 0.25);
+  ctx.fillStyle = world.ground2;
+  ctx.fillRect(0, H * 0.75, W, 4);
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 5; i++) {
+    const sx = (frame * 3 + i * 100) % W;
+    const sy = H * 0.3 + i * H * 0.1;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx - 60, sy);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  for (let i = 0; i < player.trail.length; i++) {
+    const t = player.trail[i];
+    const alpha = (i / player.trail.length) * 0.5;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = CODE_COLOR[currentLetter.code];
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, Math.max(0.01, t.size), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.save();
+  if (player.flashRed > 0) {
+    ctx.fillStyle = `rgba(255,0,0,${player.flashRed / 20})`;
+    ctx.fillRect(0, 0, W, H);
+    player.flashRed--;
+  }
+
+  const pd = getPlayerDisplay();
+
+  ctx.shadowColor = CODE_COLOR[currentLetter.code];
+  ctx.shadowBlur = 25;
+  drawShape(player.x, player.y, 18, SHAPES[currentLetter.shapeIdx], CODE_COLOR[currentLetter.code]);
+  ctx.shadowBlur = 0;
+
+  // Dark halo for letter readability
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, 13, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+
+  const textSize = pd.isDigit ? 16 : 20;
+  drawText(pd.text, player.x, player.y, textSize, '#ffffff', 'center');
+  ctx.restore();
+
+  for (let b of blocks) {
+    if (b.isObs) {
+      ctx.save();
+      ctx.fillStyle = b.color;
+      ctx.fillRect(b.x - b.size, b.y - b.size, b.size * 2, b.size * 2);
+      drawText('✕', b.x, b.y, b.size, '#0a0a1a', 'center');
+      ctx.restore();
     } else {
-      cx.strokeStyle='#8b5cf6'; cx.lineWidth=2;
-      cx.shadowColor='#8b5cf6'; cx.shadowBlur=15;
-      for(let r=6;r<28;r+=8){
-        cx.globalAlpha=(1-r/28)*0.9;
-        cx.beginPath(); cx.arc(s.x,s.y,r+Math.sin(frame*0.1)*2,0,Math.PI*2); cx.stroke();
-      }
-      cx.globalAlpha=1; cx.shadowBlur=0;
-      cx.fillStyle='#ce93d8'; cx.font=pxFont(H*0.012);
-      cx.textAlign='center'; cx.fillText('▼ ВНИЗ',s.x,s.y-30);
+      drawShape(b.x, b.y, b.size * 0.7, b.shape, b.color, 10);
+      const displayText = getBlockDisplay(b);
+      const textSize = displayText.length === 1 ? b.size * 0.5 : b.size * 0.35;
+      drawText(displayText, b.x, b.y, textSize, '#0a0a1a', 'center');
     }
-    cx.restore();
-  });
-}
+  }
 
-function doTransition(newW){
-  transitioning=true; transTimer=70; transName=WORLDS[newW].name;
-  setTimeout(()=>{ worldIdx=newW; initBgDots(); blocks=[]; specials=[]; transitioning=false; },1100);
-}
+  for (let h of hearts) {
+    ctx.save();
+    ctx.fillStyle = '#ff69b4';
+    ctx.shadowColor = '#ff69b4';
+    ctx.shadowBlur = 10;
+    const s = h.size + Math.sin(h.phase) * 3;
+    ctx.font = s + 'px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('♥', h.x, h.y);
+    ctx.restore();
+  }
 
-// ═══════════════════════════════════════════
-//  PARTICLES
-// ═══════════════════════════════════════════
-function addParticles(x,y,col,n){
-  for(let i=0;i<n;i++){
-    const a=rnd(Math.PI*2), spd=1.5+rnd(3);
-    particles.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-1.5,col,a:1,sz:2+rnd(4)});
+  updateParticles();
+  drawParticles();
+
+  drawRunnerHUD();
+
+  if (transitionFrame > 0) {
+    const alpha = transitionFrame > 33 ? (66 - transitionFrame) / 33 : transitionFrame / 33;
+    ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+    ctx.fillRect(0, 0, W, H);
+    if (transitionFrame > 33 && transitionTarget >= 0) {
+      drawText(WORLDS[transitionTarget].name, W/2, H/2, 40, '#fff', 'center', 20);
+    }
+  }
+
+  if (deathFrame > 0) {
+    const flashA = Math.max(0, 0.55 * (1 - deathFrame / 20));
+    ctx.fillStyle = `rgba(255,0,0,${flashA})`;
+    ctx.fillRect(0, 0, W, H);
   }
 }
 
-function updateDust(){
-  dustParts = dustParts.filter(d=>d.a>0);
-  dustParts.forEach(d=>{ d.x+=d.vx; d.y+=d.vy; d.vy-=0.05; d.a-=0.06; });
-}
-
-function drawDust(){
-  dustParts.forEach(d=>{
-    cx.save(); cx.globalAlpha=d.a*0.5;
-    cx.fillStyle=WORLDS[worldIdx].top;
-    cx.beginPath(); cx.arc(d.x,d.y,d.sz,0,Math.PI*2); cx.fill();
-    cx.restore();
-  });
-}
-
-function updateParticles(){
-  particles = particles.filter(p=>p.a>0);
-  particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.vx*=0.95; p.a-=0.035; });
-}
-
-function drawParticles(){
-  particles.forEach(p=>{
-    if(p.a<=0) return;
-    cx.save(); cx.globalAlpha=p.a; cx.globalCompositeOperation='lighter';
-    cx.fillStyle=p.col;
-    cx.beginPath(); cx.arc(p.x,p.y,Math.max(0.01,p.sz*p.a),0,Math.PI*2); cx.fill();
-    cx.restore();
-  });
-}
-
-// ═══════════════════════════════════════════
-//  HEARTS (collectible lives)
-// ═══════════════════════════════════════════
-function updateHearts(){
-  heartT++;
-  if(heartT > 300+rndI(200) && lives < MAX_LIVES){
-    heartT=0;
-    const elevated = Math.random()<0.4;
-    const hy = elevated ? GY - H*0.22 - H*0.04 : GY - H*0.05;
-    hearts.push({x:W+30, y:hy, done:false});
-  }
-  hearts = hearts.filter(h=>h.x > -50);
-  hearts.forEach(h=>{
-    h.x -= runSpeed;
-    if(h.done) return;
-    const dist = Math.hypot(P.x-h.x, P.y-h.y);
-    if(dist < P.r + H*0.04){
-      h.done=true;
-      lives = Math.min(MAX_LIVES, lives+1);
-      addParticles(h.x, h.y, '#ff6b9d', 12);
-    }
-  });
-}
-
-function drawHearts(){
-  hearts.forEach(h=>{
-    if(h.done) return;
-    const bob = Math.sin(frame*0.1 + h.x*0.005)*H*0.008;
-    cx.save();
-    cx.font=pxFont(H*0.055);
-    cx.fillStyle='#ff6b9d';
-    cx.shadowColor='#ff6b9d'; cx.shadowBlur=22;
-    cx.textAlign='center'; cx.textBaseline='middle';
-    cx.globalCompositeOperation='lighter';
-    cx.fillText('♥', h.x, h.y+bob);
-    cx.restore();
-  });
-}
-
-// ═══════════════════════════════════════════
-//  WORLD BACKGROUND
-// ═══════════════════════════════════════════
-function initBgDots(){
-  bgDots=[];
-  for(let i=0;i<35;i++)
-    bgDots.push({x:rnd(W),y:rnd(GY),sz:rnd(2.5)+0.5,spd:rnd(0.6)+0.15,op:rnd(0.5)+0.2});
-}
-
-function drawWorld(){
-  const w=WORLDS[worldIdx];
-  // sky
-  const sg=cx.createLinearGradient(0,0,0,GY);
-  sg.addColorStop(0,w.sky); sg.addColorStop(1,w.sky+'88');
-  cx.fillStyle=sg; cx.fillRect(0,0,W,GY);
-
-  // background dots scroll at run speed to show motion
-  bgDots.forEach(d=>{
-    d.x -= d.spd + runSpeed*0.4; if(d.x<-2)d.x=W+2;
-    d.y+=Math.sin(frame*0.02+d.x*0.01)*0.4;
-    cx.save(); cx.globalAlpha=d.op;
-    cx.fillStyle=w.ptc;
-    cx.beginPath(); cx.arc(d.x,d.y,d.sz,0,Math.PI*2); cx.fill();
-    cx.restore();
-  });
-
-  // world deco
-  if(worldIdx===2){ // underwater caustics
-    cx.save(); cx.globalAlpha=0.07; cx.strokeStyle='#00aaff'; cx.lineWidth=1.5;
-    for(let i=0;i<4;i++){
-      const sx=(frame*0.4+i*W/4)%W;
-      cx.beginPath(); cx.moveTo(sx,0); cx.lineTo(sx+40,GY); cx.stroke();
-    }
-    cx.restore();
-  } else if(worldIdx===3){ // clouds
-    cx.save(); cx.fillStyle='rgba(255,255,255,0.18)';
-    for(let i=0;i<4;i++){
-      const cx2=(i*W/3+(frame*0.25))%W;
-      cx.beginPath(); cx.arc(cx2,GY*0.25,W*0.07,0,Math.PI*2);
-      cx.arc(cx2+W*0.05,GY*0.25-W*0.025,W*0.05,0,Math.PI*2);
-      cx.fill();
-    }
-    cx.restore();
-  } else if(worldIdx===4){ // underground crystals
-    cx.save(); cx.globalAlpha=0.18; cx.fillStyle=w.acc;
-    for(let i=0;i<6;i++){
-      const bx=i*(W/5)+W*0.05;
-      cx.beginPath(); cx.moveTo(bx,GY); cx.lineTo(bx-10,GY-35); cx.lineTo(bx+10,GY-35); cx.closePath();
-      cx.fill();
-    }
-    cx.restore();
-  }
-
-  // ground
-  cx.fillStyle=w.gnd; cx.fillRect(0,GY,W,H-GY);
-  cx.fillStyle=w.top; cx.fillRect(0,GY,W,7);
-
-  // transition overlay
-  if(transitioning){
-    transTimer--;
-    const fade=transTimer/70;
-    cx.fillStyle=`rgba(0,0,0,${0.85*fade})`;
-    cx.fillRect(0,0,W,H);
-    cx.save();
-    cx.font=pxFont(H*0.055);
-    cx.fillStyle='#ffd700'; cx.textAlign='center'; cx.textBaseline='middle';
-    cx.shadowColor='#ffd700'; cx.shadowBlur=40;
-    cx.fillText(transName,W/2,H/2);
-    cx.restore();
-  }
-}
-
-// ═══════════════════════════════════════════
-//  HUD
-// ═══════════════════════════════════════════
-function drawHUD(){
-  const lc  = LETTER_MAP[P.letter]?.code || 1;
-  const col = CODE_COLOR[lc];
-
-  // score — top left
-  cx.save();
-  cx.font=pxFont(H*0.03); cx.fillStyle='#ffd700';
-  cx.textAlign='left'; cx.shadowColor='#ffd700'; cx.shadowBlur=8;
-  cx.fillText('✦ '+score, W*0.03, H*0.048);
-  cx.font=pxFont(H*0.016); cx.fillStyle='rgba(255,215,0,0.45)'; cx.shadowBlur=0;
-  cx.fillText('РЕК: '+hiScore, W*0.03, H*0.072);
-  cx.restore();
-
-  // lives — top right (5 hearts)
-  cx.save();
-  cx.font=pxFont(H*0.03); cx.textAlign='center'; cx.textBaseline='middle';
-  for(let i=0;i<MAX_LIVES;i++){
-    cx.fillStyle   = i<lives ? '#ff6b9d' : 'rgba(255,107,157,0.15)';
-    cx.shadowColor = i<lives ? '#ff6b9d' : 'transparent';
-    cx.shadowBlur  = i<lives ? 10 : 0;
-    cx.globalCompositeOperation = i<lives ? 'lighter' : 'source-over';
-    cx.fillText('♥', W-W*0.04-i*W*0.052, H*0.048);
-  }
-  cx.restore();
-
-  // ── FULL CODE TABLE ─────────────────────────
-  const ty    = H*0.088;
-  const th    = H*0.155;   // tall enough for big text
+function drawRunnerHUD() {
   const cellW = W / 9;
+  const cellH = H * 0.08;
+  for (let i = 0; i < 9; i++) {
+    const code = i + 1;
+    const isCurrent = code === currentLetter.code;
+    const x = i * cellW + cellW / 2;
+    const y = cellH / 2 + 10;
 
-  cx.save();
-  cx.fillStyle='rgba(0,0,18,0.88)';
-  cx.fillRect(0, ty - H*0.012, W, th + H*0.036);
-
-  // label above table
-  cx.font=pxFont(H*0.019); cx.fillStyle='rgba(255,255,255,0.8)';
-  cx.textAlign='center'; cx.textBaseline='bottom';
-  cx.fillText('ТВОЯ БУКВА  ' + P.letter + '  →  ИЩЕШЬ КОД  ' + lc, W/2, ty - H*0.014);
-
-  for(let code=1; code<=9; code++){
-    const ccx      = (code - 0.5) * cellW;
-    const isTarget = (code === lc);
-    const acol     = CODE_COLOR[code];
-
-    if(isTarget){
-      cx.fillStyle = acol + '40';
-      roundRect(ccx - cellW*0.47, ty - H*0.006, cellW*0.94, th + H*0.012, 10);
-      cx.fill();
-      cx.strokeStyle=acol; cx.lineWidth=2.5; cx.stroke();
-      cx.shadowColor=acol; cx.shadowBlur=24;
+    ctx.save();
+    if (isCurrent) {
+      ctx.shadowColor = CODE_COLOR[code];
+      ctx.shadowBlur = 20;
+      ctx.fillStyle = CODE_COLOR[code] + '44';
     } else {
-      cx.shadowBlur=0;
+      ctx.fillStyle = '#1a1a2e';
     }
+    ctx.fillRect(i * cellW + 2, 2, cellW - 4, cellH);
+    ctx.restore();
 
-    // code digit
-    cx.font=pxFont(isTarget ? H*0.058 : H*0.042);
-    cx.fillStyle = isTarget ? acol : acol+'dd';
-    cx.textAlign='center'; cx.textBaseline='top';
-    cx.fillText(code, ccx, ty + H*0.008);
-
-    // letters — large and readable
-    cx.shadowBlur=0;
-    cx.font=pxFont(isTarget ? H*0.028 : H*0.024);
-    cx.fillStyle = isTarget ? '#ffffff' : 'rgba(255,255,255,0.8)';
-    cx.fillText(CODE_LETTERS[code].join(''), ccx, ty + H*0.075);
-  }
-  cx.restore();
-
-  // world name — small, right side, below table
-  cx.save();
-  cx.font=pxFont(H*0.014); cx.fillStyle=WORLDS[worldIdx].acc+'66';
-  cx.textAlign='right'; cx.textBaseline='top';
-  cx.fillText(WORLDS[worldIdx].name, W-W*0.03, ty+th+H*0.008);
-  cx.restore();
-
-  // jump hint (first 5 sec)
-  if(frame<300){
-    cx.save(); cx.globalAlpha=1-frame/300;
-    cx.font=pxFont(H*0.02); cx.fillStyle='rgba(255,255,255,0.7)';
-    cx.textAlign='center'; cx.fillText('TAP / ПРОБЕЛ → ПРЫЖОК', W/2, H*0.92);
-    cx.restore();
+    drawText(code, x, y - 8, 14, isCurrent ? CODE_COLOR[code] : '#666', 'center', isCurrent ? 10 : 0);
+    drawText(CODE_GROUPS[code].join(' '), x, y + 10, 10, isCurrent ? '#fff' : '#444', 'center');
   }
 
-  // ↺ restart button — bottom left
-  const rbw=H*0.1, rbh=H*0.065, rbx=W*0.03, rby=H*0.88;
-  hudRestartRect={x:rbx,y:rby,w:rbw,h:rbh};
-  cx.save();
-  cx.fillStyle='rgba(255,100,100,0.12)'; cx.strokeStyle='rgba(255,100,100,0.5)'; cx.lineWidth=1.5;
-  roundRect(rbx,rby,rbw,rbh,rbh/2); cx.fill(); cx.stroke();
-  cx.font=pxFont(H*0.03); cx.fillStyle='rgba(255,160,160,0.9)';
-  cx.textAlign='center'; cx.textBaseline='middle';
-  cx.fillText('↺', rbx+rbw/2, rby+rbh/2);
-  cx.restore();
-
-  // speed control [◀] 1.6× [▶] — bottom right
-  const sbh=H*0.065, sbtnW=H*0.075, slabelW=H*0.14;
-  const sbBase = W - W*0.03 - sbtnW*2 - slabelW;
-  const sby    = H*0.88;
-  hudSpeedMinus={x:sbBase,                y:sby, w:sbtnW,    h:sbh};
-  hudSpeedPlus ={x:sbBase+sbtnW+slabelW,  y:sby, w:sbtnW,    h:sbh};
-
-  cx.save();
-  cx.lineWidth=1.5;
-  cx.fillStyle='rgba(100,180,255,0.12)'; cx.strokeStyle='rgba(100,180,255,0.45)';
-  roundRect(hudSpeedMinus.x,sby,sbtnW,sbh,sbh/2); cx.fill(); cx.stroke();
-  cx.font=pxFont(H*0.028); cx.fillStyle='rgba(150,210,255,0.9)';
-  cx.textAlign='center'; cx.textBaseline='middle';
-  cx.fillText('◀', hudSpeedMinus.x+sbtnW/2, sby+sbh/2);
-
-  cx.font=pxFont(H*0.024); cx.fillStyle='#ffd700';
-  cx.shadowColor='#ffd700'; cx.shadowBlur=8;
-  cx.fillText(SPEED_LABELS[speedIdx], sbBase+sbtnW+slabelW/2, sby+sbh/2);
-  cx.shadowBlur=0;
-
-  cx.fillStyle='rgba(100,180,255,0.12)'; cx.strokeStyle='rgba(100,180,255,0.45)';
-  roundRect(hudSpeedPlus.x,sby,sbtnW,sbh,sbh/2); cx.fill(); cx.stroke();
-  cx.fillStyle='rgba(150,210,255,0.9)';
-  cx.fillText('▶', hudSpeedPlus.x+sbtnW/2, sby+sbh/2);
-  cx.restore();
-}
-
-// ═══════════════════════════════════════════
-//  MENU
-// ═══════════════════════════════════════════
-let menuOrbs=[], menuBtns=[];
-
-function initMenuOrbs(){
-  menuOrbs=[];
-  for(let i=0;i<9;i++)
-    menuOrbs.push({
-      x:rnd(W),y:rnd(H),vx:(Math.random()-0.5)*1.2,vy:(Math.random()-0.5)*1.2,
-      r:7+rnd(9),col:CODE_COLOR[rndI(9)+1],letter:rndL()
-    });
-}
-
-function drawMenu(){
-  cx.fillStyle='#0a0a1a'; cx.fillRect(0,0,W,H);
-  menuBtns=[];
-
-  menuOrbs.forEach(o=>{
-    o.x+=o.vx; o.y+=o.vy;
-    if(o.x<0||o.x>W) o.vx*=-1;
-    if(o.y<0||o.y>H) o.vy*=-1;
-    cx.save(); cx.globalCompositeOperation='lighter';
-    const gr=cx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r*3.5);
-    gr.addColorStop(0,o.col+'99'); gr.addColorStop(1,'transparent');
-    cx.fillStyle=gr; cx.beginPath(); cx.arc(o.x,o.y,o.r*3.5,0,Math.PI*2); cx.fill();
-    cx.restore();
-    cx.save(); cx.font=pxFont(o.r*1.1); cx.fillStyle='#fff';
-    cx.textAlign='center'; cx.textBaseline='middle';
-    cx.fillText(o.letter,o.x,o.y);
-    cx.restore();
-  });
-
-  // title
-  cx.save();
-  cx.font=pxFont(H*0.075); cx.fillStyle='#ffd700';
-  cx.textAlign='center'; cx.textBaseline='middle';
-  cx.shadowColor='#ffd700'; cx.shadowBlur=35;
-  cx.fillText('НЕЙРО-КОД',W/2,H*0.18);
-  cx.font=pxFont(H*0.032); cx.fillStyle='#ffec8b';
-  cx.shadowBlur=12; cx.fillText('ТОЧКА СВЕТА',W/2,H*0.27);
-  cx.restore();
-
-  menuBtn('▶  БЕГУН', W/2, H*0.43, 'run');
-  menuBtn('◈  ГОЛОВОЛОМКА', W/2, H*0.55, 'qs');
-  menuBtn('✦  СПРАВКА', W/2, H*0.67, 'ref');
-
-  cx.save(); cx.font=pxFont(H*0.02); cx.fillStyle='rgba(255,215,0,0.45)';
-  cx.textAlign='center'; cx.fillText('РЕКОРД: '+hiScore, W/2, H*0.86);
-  cx.restore();
-
-  // back to Prana
-  cx.save(); cx.font=pxFont(H*0.017); cx.fillStyle='rgba(139,92,246,0.7)';
-  cx.textAlign='center'; cx.fillText('← вернуться в ПРАНА', W/2, H*0.94);
-  menuBtns.push({x:W*0.1,y:H*0.91,w:W*0.8,h:H*0.06,a:'prana'});
-  cx.restore();
-}
-
-function menuBtn(txt,x,y,action){
-  const bw=Math.min(W*0.72,320*devicePixelRatio), bh=H*0.072;
-  const bx=x-bw/2, by=y-bh/2;
-  menuBtns.push({x:bx,y:by,w:bw,h:bh,a:action});
-  cx.save();
-  cx.fillStyle='rgba(255,215,0,0.08)'; cx.strokeStyle='rgba(255,215,0,0.45)'; cx.lineWidth=1.5;
-  roundRect(bx,by,bw,bh,bh/2); cx.fill(); cx.stroke();
-  cx.font=pxFont(H*0.028); cx.fillStyle='#ffd700';
-  cx.textAlign='center'; cx.textBaseline='middle';
-  cx.shadowColor='#ffd700'; cx.shadowBlur=10;
-  cx.fillText(txt,x,y);
-  cx.restore();
-}
-
-// ═══════════════════════════════════════════
-//  QUIZ
-// ═══════════════════════════════════════════
-let qBtns=[];
-
-function genQuestion(d){
-  const letter = rndL();
-  const info   = LETTER_MAP[letter];
-  if(d===1){
-    const opts = shuffle([...new Set([info.code, ...Array.from({length:10},()=>rndI(9)+1)])]).slice(0,4);
-    return {type:1,letter,ans:info.code,opts};
-  } else if(d===2){
-    const pool = shuffle([...ALL_LETTERS]).slice(0,4);
-    if(!pool.includes(letter)) pool[0]=letter;
-    shuffle(pool);
-    return {type:2,shape:info.shape,code:info.code,letter,ans:letter,opts:pool};
+  let hintText;
+  if (difficulty === 1) {
+    hintText = `ТВОЯ БУКВА ${currentLetter.letter} → ИЩЕШЬ КОД ${currentLetter.code}`;
+  } else if (difficulty === 2) {
+    hintText = `ТВОЙ КОД ${currentLetter.code} → ИЩЕШЬ БУКВУ ${currentLetter.letter}`;
   } else {
-    const nOpts = shuffle([...new Set([info.code,...Array.from({length:10},()=>rndI(9)+1)])]).slice(0,4);
-    return {type:3,letter,ansCode:info.code,ansShape:info.shape,nOpts,sOpts:[0,1,2,3],selN:null,selS:null};
+    hintText = `ТВОЙ КОД ${currentLetter.code} → НАЙДИ БУКВУ ИЗ ЭТОЙ ГРУППЫ`;
+  }
+  drawText(hintText, W/2, cellH + 25, 14, '#fff', 'center', 5);
+
+  drawText(`ОЧКИ: ${score}`, 20, 30, 16, '#ffd700', 'left');
+  drawText(`РЕКОРД: ${hiScore}`, 20, 50, 12, '#888', 'left');
+
+  const diffNames = ['', 'ЦИФРЫ', 'БУКВЫ', 'ЦИФРА→БУКВА'];
+  drawText(diffNames[difficulty], W/2, 30, 12, '#666', 'center');
+
+  let heartStr = '';
+  for (let i = 0; i < lives; i++) heartStr += '♥ ';
+  drawText(heartStr, W - 20, 30, 20, '#ff4444', 'right');
+
+  drawButton('↺', 40, H - 40, 50, 40, '#ff4444', '#fff');
+
+  drawButton('◀', W - 120, H - 40, 50, 40, '#333', '#fff');
+  drawText(`${SPEED_STEPS[speedIdx].toFixed(1)}×`, W - 60, H - 40, 14, '#ffd700', 'center');
+  drawButton('▶', W - 40, H - 40, 50, 40, '#333', '#fff');
+
+  if (showHint) {
+    ctx.save();
+    ctx.globalAlpha = 0.7 + Math.sin(frame * 0.1) * 0.3;
+    drawText('TAP / ПРОБЕЛ → ПРЫЖОК', W/2, H * 0.5, 20, '#fff', 'center', 10);
+    ctx.restore();
   }
 }
 
-function drawQuiz(){
-  cx.fillStyle='#0a0a1a'; cx.fillRect(0,0,W,H);
-  qBtns=[];
+// ==================== ВЫБОР СЛОЖНОСТИ ====================
+function drawDifficulty() {
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
 
-  if(!qQuestion) qQuestion=genQuestion(qDiff);
-  const q=qQuestion;
+  drawText('ВЫБЕРИ УРОВЕНЬ', W/2, H * 0.15, 28, '#ffd700', 'center', 15);
 
-  // score
-  cx.save();
-  cx.font=pxFont(H*0.03); cx.fillStyle='#ffd700';
-  cx.textAlign='left'; cx.fillText('✦ '+qScore, W*0.04, H*0.055);
-  if(qStreak>=2){
-    cx.fillStyle='#00d4aa'; cx.textAlign='right';
-    cx.fillText('x'+qStreak+'!', W-W*0.04, H*0.055);
+  const btnW = 300;
+  const btnH = 70;
+  const startY = H * 0.3;
+
+  drawButton('1  ЦИФРЫ', W/2, startY, btnW, btnH, '#00ff66', '#0a0a1a', 10);
+  drawText('Игрок = цифра, блоки = цифры', W/2, startY + 45, 12, '#888', 'center');
+
+  drawButton('2  БУКВЫ', W/2, startY + 100, btnW, btnH, '#00ccff', '#0a0a1a', 10);
+  drawText('Игрок = буква, блоки = буквы', W/2, startY + 145, 12, '#888', 'center');
+
+  drawButton('3  ЦИФРА→БУКВА', W/2, startY + 200, btnW, btnH, '#ff8800', '#0a0a1a', 10);
+  drawText('Игрок = цифра, блоки = буквы! Переводи!', W/2, startY + 245, 12, '#888', 'center');
+
+  drawButton('◀ МЕНЮ', 80, H - 40, 120, 40, '#333', '#fff');
+}
+
+function handleDifficulty(x, y) {
+  const btnW = 300;
+  const btnH = 70;
+  const startY = H * 0.3;
+
+  if (isInside(x, y, W/2, startY, btnW, btnH)) {
+    difficulty = 1; initRunner(); screen = 'runner';
+  } else if (isInside(x, y, W/2, startY + 100, btnW, btnH)) {
+    difficulty = 2; initRunner(); screen = 'runner';
+  } else if (isInside(x, y, W/2, startY + 200, btnW, btnH)) {
+    difficulty = 3; initRunner(); screen = 'runner';
+  } else if (isInside(x, y, 80, H - 40, 120, 40)) {
+    screen = 'menu';
   }
-  cx.restore();
+}
 
-  const QY=H*0.24;
+// ==================== КВИЗ ЛОГИКА ====================
+function initQuiz() {
+  quizScore = 0;
+  quizStreak = 0;
+  quizAnswered = false;
+  quizWait = 0;
+  generateQuizQuestion();
+}
 
-  if(q.type===1){
-    const col=CODE_COLOR[q.ans];
-    cx.save();
-    cx.font=pxFont(H*0.15); cx.fillStyle=col;
-    cx.textAlign='center'; cx.textBaseline='middle';
-    cx.shadowColor=col; cx.shadowBlur=50;
-    cx.fillText(q.letter,W/2,QY);
-    cx.shadowBlur=0; cx.font=pxFont(H*0.022);
-    cx.fillStyle='rgba(255,255,255,0.5)'; cx.textBaseline='bottom';
-    cx.fillText('Какой код у этой буквы?',W/2,QY-H*0.09);
-    cx.restore();
-    q.opts.forEach((o,i)=>qBtn(o,i,q,o===q.ans,o));
+function generateQuizQuestion() {
+  const letters = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'.split('');
+  const target = letters[Math.floor(Math.random() * letters.length)];
+  const info = getLetterCode(target);
 
-  } else if(q.type===2){
-    const col=CODE_COLOR[q.code];
-    cx.save();
-    cx.shadowColor=col; cx.shadowBlur=30;
-    drawShape(q.shape,W/2,QY,H*0.07,col+'44',col);
-    cx.fillStyle=col; cx.font=pxFont(H*0.038);
-    cx.textAlign='center'; cx.textBaseline='top';
-    cx.fillText(q.code,W/2,QY+H*0.08);
-    cx.shadowBlur=0; cx.font=pxFont(H*0.022);
-    cx.fillStyle='rgba(255,255,255,0.5)'; cx.textBaseline='bottom';
-    cx.fillText('Какая буква?',W/2,QY-H*0.09);
-    cx.restore();
-    q.opts.forEach((o,i)=>{
-      const oc=CODE_COLOR[LETTER_MAP[o]?.code||1];
-      qBtn(o,i,q,o===q.ans,o,oc);
-    });
+  if (quizLevel === 1) {
+    const options = [info.code];
+    while (options.length < 4) {
+      const c = Math.floor(Math.random() * 9) + 1;
+      if (!options.includes(c)) options.push(c);
+    }
+    options.sort(() => Math.random() - 0.5);
+    quizQuestion = { type: 1, target, correct: info.code, options, selected: -1 };
+  } else if (quizLevel === 2) {
+    const options = [target];
+    while (options.length < 4) {
+      const l = letters[Math.floor(Math.random() * letters.length)];
+      if (!options.includes(l)) options.push(l);
+    }
+    options.sort(() => Math.random() - 0.5);
+    quizQuestion = { type: 2, target: info, correct: target, options, selected: -1 };
+  } else {
+    quizQuestion = {
+      type: 3, target, correctCode: info.code, correctShape: info.shapeIdx,
+      selectedCode: -1, selectedShape: -1, checked: false
+    };
+  }
+}
 
-  } else { // hard
-    const col=CODE_COLOR[q.ansCode];
-    cx.save();
-    cx.font=pxFont(H*0.1); cx.fillStyle=col;
-    cx.textAlign='center'; cx.textBaseline='middle';
-    cx.shadowColor=col; cx.shadowBlur=40;
-    cx.fillText(q.letter,W/2,QY);
-    cx.shadowBlur=0; cx.font=pxFont(H*0.02);
-    cx.fillStyle='rgba(255,255,255,0.5)'; cx.textBaseline='bottom';
-    cx.fillText('Выбери КОД и ФИГУРУ',W/2,QY-H*0.07);
-    cx.restore();
+function updateQuiz() {
+  if (quizAnswered) {
+    quizWait--;
+    if (quizWait <= 0) {
+      quizAnswered = false;
+      generateQuizQuestion();
+    }
+  }
+}
 
-    cx.save(); cx.font=pxFont(H*0.018); cx.fillStyle='rgba(255,215,0,0.6)';
-    cx.textAlign='left'; cx.fillText('КОД:',W*0.04,H*0.52);
-    cx.restore();
-    q.nOpts.forEach((o,i)=>{
-      const bw=W*0.21, bh=H*0.07, bx=W*0.04+i*(bw+W*0.015), by=H*0.535;
-      qBtns.push({x:bx,y:by,w:bw,h:bh,v:o,kind:'n'});
-      const sel=q.selN===o, ok=qResult!==null&&o===q.ansCode, bad=qResult!==null&&sel&&o!==q.ansCode;
-      cx.save();
-      cx.fillStyle=ok?'rgba(0,212,170,0.3)':bad?'rgba(255,100,100,0.3)':sel?'rgba(255,215,0,0.2)':'rgba(255,215,0,0.07)';
-      cx.strokeStyle=ok?'#00d4aa':bad?'#ff6666':sel?'#ffd700':'rgba(255,215,0,0.35)';
-      cx.lineWidth=1.5;
-      roundRect(bx,by,bw,bh,10); cx.fill(); cx.stroke();
-      cx.font=pxFont(H*0.04); cx.fillStyle=CODE_COLOR[o];
-      cx.textAlign='center'; cx.textBaseline='middle';
-      cx.fillText(o,bx+bw/2,by+bh/2);
-      cx.restore();
-    });
+function drawQuiz() {
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
 
-    cx.save(); cx.font=pxFont(H*0.018); cx.fillStyle='rgba(255,215,0,0.6)';
-    cx.textAlign='left'; cx.fillText('ФИГУРА:',W*0.04,H*0.65);
-    cx.restore();
-    [0,1,2,3].forEach((sh,i)=>{
-      const bw=W*0.21, bh=H*0.08, bx=W*0.04+i*(bw+W*0.015), by=H*0.665;
-      qBtns.push({x:bx,y:by,w:bw,h:bh,v:sh,kind:'s'});
-      const sel=q.selS===sh, ok=qResult!==null&&sh===q.ansShape, bad=qResult!==null&&sel&&sh!==q.ansShape;
-      cx.save();
-      cx.fillStyle=ok?'rgba(0,212,170,0.3)':bad?'rgba(255,100,100,0.3)':sel?'rgba(255,215,0,0.2)':'rgba(255,215,0,0.07)';
-      cx.strokeStyle=ok?'#00d4aa':bad?'#ff6666':sel?'#ffd700':'rgba(255,215,0,0.35)';
-      cx.lineWidth=1.5;
-      roundRect(bx,by,bw,bh,10); cx.fill(); cx.stroke();
-      cx.shadowBlur=0;
-      drawShape(sh,bx+bw/2,by+bh/2,bh*0.3,col+'66',col);
-      cx.restore();
-    });
+  drawText('ГОЛОВОЛОМКА', W/2, 40, 24, '#ffd700', 'center', 10);
+  drawText(`Уровень: ${quizLevel === 1 ? 'ЛЁГКИЙ' : quizLevel === 2 ? 'СРЕДНИЙ' : 'СЛОЖНЫЙ'}`, W/2, 70, 14, '#888', 'center');
+  drawText(`Очки: ${quizScore} | Стрик: ${quizStreak}`, W/2, 95, 14, '#fff', 'center');
 
-    if(q.selN!==null&&q.selS!==null&&qResult===null){
-      const bw=W*0.4, bh=H*0.065, bx=W/2-bw/2, by=H*0.79;
-      qBtns.push({x:bx,y:by,w:bw,h:bh,v:'check',kind:'ok'});
-      cx.save();
-      cx.fillStyle='rgba(0,212,170,0.2)'; cx.strokeStyle='#00d4aa'; cx.lineWidth=2;
-      roundRect(bx,by,bw,bh,bh/2); cx.fill(); cx.stroke();
-      cx.font=pxFont(H*0.028); cx.fillStyle='#00d4aa';
-      cx.textAlign='center'; cx.textBaseline='middle';
-      cx.fillText('ПРОВЕРИТЬ',W/2,by+bh/2);
-      cx.restore();
+  if (!quizQuestion) return;
+
+  const q = quizQuestion;
+
+  if (q.type === 1) {
+    drawText(q.target, W/2, H * 0.25, 80, '#fff', 'center', 20);
+    drawText('Выбери цифру:', W/2, H * 0.4, 16, '#888', 'center');
+
+    const btnW = W * 0.18;
+    const btnH = 60;
+    const startX = W/2 - (btnW * 2 + 20);
+    for (let i = 0; i < 4; i++) {
+      const x = startX + i * (btnW + 15);
+      const y = H * 0.5;
+      let color = '#1a1a2e', glow = 0;
+      if (quizAnswered) {
+        if (q.options[i] === q.correct) { color = '#00ff66'; glow = 15; }
+        else if (q.selected === i) { color = '#ff4444'; glow = 10; }
+      } else if (q.selected === i) { color = '#333'; }
+      drawButton(q.options[i].toString(), x, y, btnW, btnH, color, '#fff', glow);
+    }
+  } else if (q.type === 2) {
+    const info = q.target;
+    drawShape(W/2, H * 0.22, 50, SHAPES[info.shapeIdx], CODE_COLOR[info.code], 25);
+    drawText(info.code.toString(), W/2, H * 0.22, 30, '#0a0a1a', 'center');
+    drawText('Угадай букву:', W/2, H * 0.4, 16, '#888', 'center');
+
+    const btnW = W * 0.18;
+    const btnH = 60;
+    const startX = W/2 - (btnW * 2 + 20);
+    for (let i = 0; i < 4; i++) {
+      const x = startX + i * (btnW + 15);
+      const y = H * 0.5;
+      let color = '#1a1a2e', glow = 0;
+      if (quizAnswered) {
+        if (q.options[i] === q.correct) { color = '#00ff66'; glow = 15; }
+        else if (q.selected === i) { color = '#ff4444'; glow = 10; }
+      } else if (q.selected === i) { color = '#333'; }
+      drawButton(q.options[i], x, y, btnW, btnH, color, '#fff', glow);
+    }
+  } else if (q.type === 3) {
+    drawText(q.target, W/2, H * 0.18, 80, '#fff', 'center', 20);
+    drawText('Выбери цифру:', W/2, H * 0.32, 14, '#888', 'center');
+
+    const numW = W * 0.08;
+    const numStart = W/2 - (numW * 4.5 + 30);
+    for (let i = 0; i < 9; i++) {
+      const x = numStart + i * (numW + 8);
+      const y = H * 0.38;
+      let color = '#1a1a2e', glow = 0;
+      if (quizAnswered) {
+        if (i + 1 === q.correctCode) { color = '#00ff66'; glow = 15; }
+        else if (q.selectedCode === i + 1) { color = '#ff4444'; glow = 10; }
+      } else if (q.selectedCode === i + 1) { color = CODE_COLOR[i + 1]; glow = 10; }
+      drawButton((i+1).toString(), x, y, numW, 40, color, '#fff', glow);
+    }
+
+    drawText('Выбери форму:', W/2, H * 0.48, 14, '#888', 'center');
+
+    const shapeW = W * 0.2;
+    const shapeStart = W/2 - (shapeW * 2 + 15);
+    for (let i = 0; i < 4; i++) {
+      const x = shapeStart + i * (shapeW + 10);
+      const y = H * 0.58;
+      let color = '#1a1a2e', glow = 0;
+      if (quizAnswered) {
+        if (i === q.correctShape) { color = '#00ff66'; glow = 15; }
+        else if (q.selectedShape === i) { color = '#ff4444'; glow = 10; }
+      } else if (q.selectedShape === i) { color = '#333'; }
+      drawButton(SHAPE_NAMES[i], x, y, shapeW, 45, color, '#fff', glow);
+    }
+
+    if (!quizAnswered && q.selectedCode > 0 && q.selectedShape >= 0) {
+      drawButton('ПРОВЕРИТЬ', W/2, H * 0.72, 160, 50, '#ffd700', '#0a0a1a', 15);
     }
   }
 
-  // result feedback
-  if(qResult!==null){
-    const ok = q.type===3 ? qResult : qResult===q.ans;
-    cx.save();
-    cx.font=pxFont(H*0.04); cx.fillStyle=ok?'#00d4aa':'#ff6666';
-    cx.textAlign='center'; cx.textBaseline='bottom';
-    cx.shadowColor=cx.fillStyle; cx.shadowBlur=25;
-    cx.fillText(ok?'✦ ВЕРНО!':'✕ НЕВЕРНО', W/2, H*0.94);
-    cx.restore();
+  updateParticles();
+  drawParticles();
+
+  drawButton('◀ МЕНЮ', 80, H - 40, 120, 40, '#333', '#fff');
+}
+
+// ==================== МЕНЮ ====================
+function updateMenu() {
+  for (let orb of orbs) {
+    orb.x += orb.vx;
+    orb.y += orb.vy;
+    orb.phase += 0.02;
+    if (orb.x < -50 || orb.x > W + 50) orb.vx *= -1;
+    if (orb.y < -50 || orb.y > H + 50) orb.vy *= -1;
+  }
+}
+
+function drawMenu() {
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
+
+  for (let orb of orbs) {
+    const color = CODE_COLOR[orb.code];
+    ctx.save();
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 20 + Math.sin(orb.phase) * 10;
+    ctx.fillStyle = color + '66';
+    ctx.beginPath();
+    ctx.arc(orb.x, orb.y, orb.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    const group = CODE_GROUPS[orb.code];
+    const letter = group[Math.floor(orb.phase * 0.5) % group.length];
+    drawText(letter, orb.x, orb.y, orb.r * 0.6, '#fff', 'center');
   }
 
-  cx.save(); cx.font=pxFont(H*0.017); cx.fillStyle='rgba(255,215,0,0.35)';
-  cx.textAlign='right'; cx.fillText(['','ЛЁГКИЙ','СРЕДНИЙ','СЛОЖНЫЙ'][qDiff], W-W*0.04, H*0.985);
-  cx.restore();
+  drawText('НЕЙРО-КОД', W/2, H * 0.18, 36, '#ffd700', 'center', 20);
+  drawText('ТОЧКА СВЕТА', W/2, H * 0.25, 24, '#fff', 'center', 10);
 
-  backBtn();
+  const btnW = 220;
+  const btnH = 55;
+  const startY = H * 0.4;
+  drawButton('▶ БЕГУН', W/2, startY, btnW, btnH, '#00ff66', '#0a0a1a', 10);
+  drawButton('◈ ГОЛОВОЛОМКА', W/2, startY + 70, btnW, btnH, '#00ccff', '#0a0a1a', 10);
+  drawButton('✦ СПРАВКА', W/2, startY + 140, btnW, btnH, '#ffd700', '#0a0a1a', 10);
+
+  drawText(`РЕКОРД: ${hiScore}`, W/2, H * 0.78, 16, '#888', 'center');
+  drawText('← вернуться в ПРАНА', W/2, H * 0.88, 14, '#666', 'center');
 }
 
-function qBtn(val,i,q,isAns,checkVal,col){
-  col = col||CODE_COLOR[val];
-  const bw=W*0.43, bh=H*0.085;
-  const bx = (i%2===0?W*0.04:W*0.53), by=H*0.54+Math.floor(i/2)*(bh+H*0.018);
-  qBtns.push({x:bx,y:by,w:bw,h:bh,v:checkVal,kind:'opt'});
-  const sel=qResult===checkVal, ok=qResult!==null&&isAns, bad=sel&&!isAns;
-  cx.save();
-  cx.fillStyle=ok?'rgba(0,212,170,0.3)':bad?'rgba(255,100,100,0.3)':'rgba(255,215,0,0.07)';
-  cx.strokeStyle=ok?'#00d4aa':bad?'#ff6666':'rgba(255,215,0,0.35)';
-  cx.lineWidth=1.5;
-  roundRect(bx,by,bw,bh,12); cx.fill(); cx.stroke();
-  cx.font=pxFont(H*0.048); cx.fillStyle=col;
-  cx.textAlign='center'; cx.textBaseline='middle';
-  cx.shadowColor=col; cx.shadowBlur=12;
-  cx.fillText(val,bx+bw/2,by+bh/2);
-  cx.restore();
-}
+// ==================== СПРАВКА ====================
+let helpScroll = 0;
+let helpDragging = false;
+let helpLastY = 0;
 
-// ═══════════════════════════════════════════
-//  QUIZ DIFFICULTY SELECT
-// ═══════════════════════════════════════════
-let diffBtns=[];
-function drawQuizSelect(){
-  cx.fillStyle='#0a0a1a'; cx.fillRect(0,0,W,H);
-  diffBtns=[];
+function drawHelp() {
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
 
-  cx.save();
-  cx.font=pxFont(H*0.048); cx.fillStyle='#ffd700';
-  cx.textAlign='center'; cx.textBaseline='middle';
-  cx.shadowColor='#ffd700'; cx.shadowBlur=25;
-  cx.fillText('УРОВЕНЬ СЛОЖНОСТИ',W/2,H*0.14);
-  cx.restore();
+  drawText('СПРАВКА', W/2, 40, 24, '#ffd700', 'center', 10);
+  drawText('Свайп для прокрутки', W/2, 65, 12, '#666', 'center');
 
-  const lvls=[
-    {d:1,label:'1  ЛЁГКИЙ',   desc:'Буква → Цифра',         col:'#00d4aa'},
-    {d:2,label:'2  СРЕДНИЙ',   desc:'Фигура → Буква',        col:'#ffd700'},
-    {d:3,label:'3  СЛОЖНЫЙ',   desc:'Буква → Цифра + Фигура',col:'#ff6b9d'}
-  ];
-  lvls.forEach((lv,i)=>{
-    const bw=W*0.82, bh=H*0.115;
-    const bx=W*0.09, by=H*0.26+i*(bh+H*0.035);
-    diffBtns.push({x:bx,y:by,w:bw,h:bh,d:lv.d});
-    cx.save();
-    cx.fillStyle=lv.col+'1a'; cx.strokeStyle=lv.col; cx.lineWidth=2;
-    roundRect(bx,by,bw,bh,15); cx.fill(); cx.stroke();
-    cx.font=pxFont(H*0.038); cx.fillStyle=lv.col;
-    cx.textAlign='center'; cx.textBaseline='middle';
-    cx.shadowColor=lv.col; cx.shadowBlur=15;
-    cx.fillText(lv.label,bx+bw/2,by+bh*0.38);
-    cx.font=pxFont(H*0.022); cx.fillStyle=lv.col+'aa'; cx.shadowBlur=0;
-    cx.fillText(lv.desc,bx+bw/2,by+bh*0.72);
-    cx.restore();
-  });
-  backBtn();
-}
+  const colW = W / 3;
+  const rowH = 45;
+  const startY = 100 - helpScroll;
 
-// ═══════════════════════════════════════════
-//  REFERENCE TABLE
-// ═══════════════════════════════════════════
-let refScroll=0, refDrag=0, refDragY=0;
-function drawRef(){
-  cx.fillStyle='#0a0a1a'; cx.fillRect(0,0,W,H);
-  cx.save();
-  cx.font=pxFont(H*0.04); cx.fillStyle='#ffd700';
-  cx.textAlign='center'; cx.shadowColor='#ffd700'; cx.shadowBlur=20;
-  cx.fillText('ТАБЛИЦА КОДОВ',W/2,H*0.06);
-  cx.restore();
+  drawText('БУКВА', colW * 0.5, startY, 14, '#ffd700', 'center');
+  drawText('ЦИФРА', colW * 1.5, startY, 14, '#ffd700', 'center');
+  drawText('ФИГУРА', colW * 2.5, startY, 14, '#ffd700', 'center');
 
-  cx.save(); cx.rect(0,H*0.09,W,H*0.84); cx.clip();
+  const allLetters = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'.split('');
+  for (let i = 0; i < allLetters.length; i++) {
+    const y = startY + 30 + i * rowH;
+    if (y < -20 || y > H + 20) continue;
 
-  const cols=3, cellW=W/cols, cellH=H*0.115;
-  let idx=0;
-  Object.entries(CODE_LETTERS).forEach(([code,letters])=>{
-    letters.forEach(letter=>{
-      const col=idx%cols, row=Math.floor(idx/cols);
-      const cy=H*0.11+row*cellH+refScroll;
-      if(cy>-cellH && cy<H){
-        const c=CODE_COLOR[+code];
-        cx.save();
-        cx.fillStyle=c+'18'; cx.strokeStyle=c+'55'; cx.lineWidth=1;
-        roundRect(col*cellW+4,cy,cellW-8,cellH-6,8); cx.fill(); cx.stroke();
-        cx.font=pxFont(H*0.045); cx.fillStyle='#fff';
-        cx.textAlign='center'; cx.textBaseline='middle';
-        cx.fillText(letter, col*cellW+cellW*0.25, cy+cellH*0.45);
-        cx.fillStyle=c; cx.font=pxFont(H*0.038);
-        cx.fillText(code, col*cellW+cellW*0.58, cy+cellH*0.45);
-        drawShape(LETTER_MAP[letter].shape, col*cellW+cellW*0.85, cy+cellH*0.45, cellH*0.18, c+'55', c);
-        cx.restore();
-      }
-      idx++;
-    });
-  });
-  cx.restore();
-  backBtn();
-}
+    const info = getLetterCode(allLetters[i]);
+    if (!info) continue;
 
-// ═══════════════════════════════════════════
-//  GAME OVER
-// ═══════════════════════════════════════════
-function drawGameOver(){
-  cx.fillStyle='rgba(10,10,26,0.97)'; cx.fillRect(0,0,W,H);
-  menuBtns=[];
+    ctx.fillStyle = i % 2 === 0 ? '#111122' : '#0a0a1a';
+    ctx.fillRect(0, y - rowH/2, W, rowH);
 
-  cx.save();
-  cx.textAlign='center'; cx.textBaseline='middle';
-
-  cx.font=pxFont(H*0.062); cx.fillStyle='#ff6b9d';
-  cx.shadowColor='#ff6b9d'; cx.shadowBlur=35;
-  cx.fillText('ИГРА ОКОНЧЕНА', W/2, H*0.19);
-
-  cx.font=pxFont(H*0.12); cx.fillStyle='#ffd700';
-  cx.shadowColor='#ffd700'; cx.shadowBlur=45;
-  cx.fillText(score, W/2, H*0.38);
-
-  cx.font=pxFont(H*0.024); cx.fillStyle='rgba(255,215,0,0.5)'; cx.shadowBlur=0;
-  cx.fillText('РЕКОРД: '+hiScore, W/2, H*0.51);
-  cx.restore();
-
-  // big restart button
-  const bw=W*0.74, bh=H*0.105, bx=W/2-bw/2, by=H*0.6;
-  menuBtns.push({x:bx, y:by, w:bw, h:bh, a:'run'});
-  cx.save();
-  cx.fillStyle='rgba(255,215,0,0.15)';
-  cx.strokeStyle='#ffd700'; cx.lineWidth=2.5;
-  cx.shadowColor='#ffd700'; cx.shadowBlur=30;
-  roundRect(bx,by,bw,bh,bh/2); cx.fill(); cx.stroke();
-  cx.font=pxFont(H*0.044); cx.fillStyle='#ffd700';
-  cx.textAlign='center'; cx.textBaseline='middle';
-  cx.fillText('↺  НАЧАТЬ ЗАНОВО', W/2, by+bh/2);
-  cx.restore();
-
-  // menu button
-  const mw=W*0.4, mh=H*0.065, mx=W/2-mw/2, my=H*0.78;
-  menuBtns.push({x:mx, y:my, w:mw, h:mh, a:'menu'});
-  cx.save();
-  cx.fillStyle='rgba(255,215,0,0.05)'; cx.strokeStyle='rgba(255,215,0,0.2)'; cx.lineWidth=1;
-  roundRect(mx,my,mw,mh,mh/2); cx.fill(); cx.stroke();
-  cx.font=pxFont(H*0.024); cx.fillStyle='rgba(255,215,0,0.35)';
-  cx.textAlign='center'; cx.textBaseline='middle';
-  cx.fillText('◀ МЕНЮ', W/2, my+mh/2);
-  cx.restore();
-}
-
-// ═══════════════════════════════════════════
-//  BACK BUTTON
-// ═══════════════════════════════════════════
-let backBtnRect={x:0,y:0,w:0,h:0};
-let hudRestartRect={x:0,y:0,w:0,h:0};
-let hudSpeedMinus={x:0,y:0,w:0,h:0};
-let hudSpeedPlus={x:0,y:0,w:0,h:0};
-function backBtn(){
-  const bw=W*0.26, bh=H*0.055, bx=W*0.04, by=H-H*0.08;
-  backBtnRect={x:bx,y:by,w:bw,h:bh};
-  cx.save();
-  cx.fillStyle='rgba(255,215,0,0.08)'; cx.strokeStyle='rgba(255,215,0,0.4)'; cx.lineWidth=1;
-  roundRect(bx,by,bw,bh,bh/2); cx.fill(); cx.stroke();
-  cx.font=pxFont(H*0.022); cx.fillStyle='#ffd700';
-  cx.textAlign='center'; cx.textBaseline='middle';
-  cx.fillText('◀ МЕНЮ',bx+bw/2,by+bh/2);
-  cx.restore();
-}
-
-function hitBack(x,y){
-  const b=backBtnRect;
-  return x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h;
-}
-
-// ═══════════════════════════════════════════
-//  INPUT
-// ═══════════════════════════════════════════
-function toCanvas(ex,ey){
-  const r=cv.getBoundingClientRect();
-  return [(ex-r.left)*(W/r.width), (ey-r.top)*(H/r.height)];
-}
-
-function onTap(ex,ey){
-  const [x,y]=toCanvas(ex,ey);
-
-  if(screen==='runner'){
-    const r=hudRestartRect;
-    if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h){ doMenuAction('run'); return; }
-    const sm=hudSpeedMinus, sp=hudSpeedPlus;
-    if(x>=sm.x&&x<=sm.x+sm.w&&y>=sm.y&&y<=sm.y+sm.h){ speedIdx=Math.max(0,speedIdx-1); return; }
-    if(x>=sp.x&&x<=sp.x+sp.w&&y>=sp.y&&y<=sp.y+sp.h){ speedIdx=Math.min(SPEED_STEPS.length-1,speedIdx+1); return; }
-    P.jump(); return;
+    drawText(info.letter, colW * 0.5, y, 18, '#fff', 'center');
+    drawText(info.code.toString(), colW * 1.5, y, 18, CODE_COLOR[info.code], 'center');
+    drawText(SHAPE_NAMES[info.shapeIdx], colW * 2.5, y, 14, '#888', 'center');
   }
 
-  if(screen==='gameover'){
-    let handled=false;
-    menuBtns.forEach(b=>{ if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){ doMenuAction(b.a); handled=true; } });
-    if(!handled) doMenuAction('run');
-    return;
-  }
+  drawButton('◀ МЕНЮ', 80, H - 40, 120, 40, '#333', '#fff');
+}
 
-  if(screen==='menu'){
-    menuBtns.forEach(b=>{
-      if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h) doMenuAction(b.a);
-    });
-    return;
-  }
+// ==================== GAME OVER ====================
+function drawGameOver() {
+  ctx.fillStyle = 'rgba(10,10,26,0.95)';
+  ctx.fillRect(0, 0, W, H);
 
-  if(screen==='quiz-select'){
-    if(hitBack(x,y)){ screen='menu'; return; }
-    diffBtns.forEach(b=>{
-      if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){
-        qDiff=b.d; qQuestion=null; qResult=null; qResultT=0;
-        qScore=0; qStreak=0; screen='quiz';
-      }
-    });
-    return;
-  }
+  drawText('ИГРА ОКОНЧЕНА', W/2, H * 0.3, 32, '#ff4444', 'center', 20);
+  drawText(`СЧЁТ: ${score}`, W/2, H * 0.42, 24, '#fff', 'center');
+  drawText(`РЕКОРД: ${hiScore}`, W/2, H * 0.52, 18, '#ffd700', 'center');
 
-  if(screen==='quiz'){
-    if(hitBack(x,y)){ screen='quiz-select'; qQuestion=null; return; }
-    if(qResult!==null) return;
-    qBtns.forEach(b=>{
-      if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){
-        if(b.kind==='opt'){
-          const ok=b.v===qQuestion.ans;
-          qResult=b.v;
-          if(ok){ qScore+=10*(qStreak>=2?2:1); qStreak++; addParticles(W/2,H*0.5,'#00d4aa',10); }
-          else  { qStreak=0; addParticles(W/2,H*0.5,'#ff4444',6); }
-          qResultT=65;
-        } else if(b.kind==='n'){ qQuestion.selN=b.v; }
-        else if(b.kind==='s'){ qQuestion.selS=b.v; }
-        else if(b.kind==='ok'){
-          const ok=qQuestion.selN===qQuestion.ansCode&&qQuestion.selS===qQuestion.ansShape;
-          qResult=ok;
-          if(ok){ qScore+=20*(qStreak>=2?2:1); qStreak++; addParticles(W/2,H*0.5,'#00d4aa',14); }
-          else  { qStreak=0; addParticles(W/2,H*0.5,'#ff4444',7); }
-          qResultT=65;
+  const diffNames = ['', 'ЦИФРЫ', 'БУКВЫ', 'ЦИФРА→БУКВА'];
+  drawText(`Уровень: ${diffNames[difficulty]}`, W/2, H * 0.58, 14, '#888', 'center');
+
+  drawButton('↺ НАЧАТЬ ЗАНОВО', W/2, H * 0.68, 280, 60, '#ffd700', '#0a0a1a', 20);
+  drawButton('◀ МЕНЮ', W/2, H * 0.8, 160, 45, '#333', '#fff');
+
+  drawText('Тап вне кнопки = рестарт', W/2, H * 0.9, 12, '#666', 'center');
+}
+
+// ==================== УПРАВЛЕНИЕ ====================
+function jump() {
+  if (screen !== 'runner' || deathFrame > 0 || transitionFrame > 0) return;
+  if (player.jumps < 2) {
+    player.vy = -12;
+    player.jumps++;
+    player.onGround = false;
+  }
+}
+
+function restartRunner() {
+  initRunner();
+  screen = 'runner';
+}
+
+function handlePointer(x, y) {
+  if (screen === 'menu') {
+    const btnW = 220, btnH = 55, startY = H * 0.4;
+    if (isInside(x, y, W/2, startY, btnW, btnH)) {
+      screen = 'difficulty';
+    } else if (isInside(x, y, W/2, startY + 70, btnW, btnH)) {
+      initQuiz(); screen = 'quiz';
+    } else if (isInside(x, y, W/2, startY + 140, btnW, btnH)) {
+      screen = 'help'; helpScroll = 0;
+    } else if (y > H * 0.85) {
+      window.location.href = 'index.html';
+    }
+  } else if (screen === 'difficulty') {
+    handleDifficulty(x, y);
+  } else if (screen === 'runner') {
+    if (isInside(x, y, 40, H - 40, 50, 40)) { restartRunner(); return; }
+    if (isInside(x, y, W - 120, H - 40, 50, 40)) { speedIdx = Math.max(0, speedIdx - 1); return; }
+    if (isInside(x, y, W - 40, H - 40, 50, 40)) { speedIdx = Math.min(4, speedIdx + 1); return; }
+    jump();
+  } else if (screen === 'quiz') {
+    if (isInside(x, y, 80, H - 40, 120, 40)) { screen = 'menu'; return; }
+    if (quizAnswered) return;
+
+    const q = quizQuestion;
+    if (q.type === 1 || q.type === 2) {
+      const btnW = W * 0.18, btnH = 60;
+      const startX = W/2 - (btnW * 2 + 20);
+      for (let i = 0; i < 4; i++) {
+        const bx = startX + i * (btnW + 15);
+        const by = H * 0.5;
+        if (isInside(x, y, bx, by, btnW, btnH)) {
+          q.selected = i;
+          const isCorrect = q.options[i] === q.correct;
+          if (isCorrect) {
+            quizScore += 10; quizStreak++;
+            if (quizStreak >= 2) quizScore += 10;
+            spawnParticles(bx, by, '#00ff66', 15, 4);
+          } else {
+            quizStreak = 0;
+            spawnParticles(bx, by, '#ff4444', 10, 3);
+          }
+          quizAnswered = true; quizWait = 65;
+          break;
         }
       }
-    });
-    return;
-  }
-
-  if(screen==='ref'){
-    if(hitBack(x,y)){ screen='menu'; }
-    return;
+    } else if (q.type === 3) {
+      const numW = W * 0.08;
+      const numStart = W/2 - (numW * 4.5 + 30);
+      for (let i = 0; i < 9; i++) {
+        const bx = numStart + i * (numW + 8);
+        if (isInside(x, y, bx, H * 0.38, numW, 40)) { q.selectedCode = i + 1; return; }
+      }
+      const shapeW = W * 0.2;
+      const shapeStart = W/2 - (shapeW * 2 + 15);
+      for (let i = 0; i < 4; i++) {
+        const bx = shapeStart + i * (shapeW + 10);
+        if (isInside(x, y, bx, H * 0.58, shapeW, 45)) { q.selectedShape = i; return; }
+      }
+      if (q.selectedCode > 0 && q.selectedShape >= 0 &&
+          isInside(x, y, W/2, H * 0.72, 160, 50)) {
+        const correct = q.selectedCode === q.correctCode && q.selectedShape === q.correctShape;
+        if (correct) {
+          quizScore += 20; quizStreak++;
+          if (quizStreak >= 2) quizScore += 20;
+          spawnParticles(W/2, H * 0.72, '#00ff66', 20, 5);
+        } else {
+          quizStreak = 0;
+          spawnParticles(W/2, H * 0.72, '#ff4444', 15, 4);
+        }
+        quizAnswered = true; quizWait = 65;
+      }
+    }
+  } else if (screen === 'help') {
+    if (isInside(x, y, 80, H - 40, 120, 40)) screen = 'menu';
+  } else if (screen === 'gameover') {
+    if (isInside(x, y, W/2, H * 0.8, 160, 45)) {
+      screen = 'menu';
+    } else {
+      restartRunner();
+    }
   }
 }
 
-function doMenuAction(a){
-  switch(a){
-    case 'run':
-      deathFrame=-1; hearts=[]; heartT=0;
-      score=0; lives=MAX_LIVES; blocks=[]; particles=[]; specials=[]; dustParts=[];
-      spawnT=0; spawnI=80; specT=0; frame=0; transitioning=false; runSpeed=3.5;
-      worldIdx=rndI(WORLDS.length);
-      initBgDots(); P.reset(); screen='runner'; break;
-    case 'qs':
-      qQuestion=null; qScore=0; qStreak=0; screen='quiz-select'; break;
-    case 'ref':
-      refScroll=0; screen='ref'; break;
-    case 'menu':
-      screen='menu'; initMenuOrbs(); menuBtns=[]; break;
-    case 'prana':
-      window.location.href='index.html'; break;
-  }
-}
-
-cv.addEventListener('pointerdown', e=>{ onTap(e.clientX,e.clientY); });
-document.addEventListener('keydown', e=>{
-  if(e.code==='Space'||e.code==='ArrowUp'){
-    e.preventDefault();
-    if(screen==='runner') P.jump();
-    else if(screen==='gameover') doMenuAction('run');
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  handlePointer(e.clientX - rect.left, e.clientY - rect.top);
+  if (screen === 'help') {
+    helpDragging = true;
+    helpLastY = e.clientY - rect.top;
   }
 });
 
-// ref scroll
-let refTouchY=0;
-cv.addEventListener('touchstart', e=>{ refTouchY=e.touches[0].clientY; },{passive:true});
-cv.addEventListener('touchmove', e=>{
-  if(screen==='ref'){
-    const dy=e.touches[0].clientY-refTouchY;
-    refScroll+=dy; refTouchY=e.touches[0].clientY;
-    refScroll=Math.min(0,refScroll);
+canvas.addEventListener('pointermove', e => {
+  if (screen === 'help' && helpDragging) {
+    const rect = canvas.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    helpScroll -= (y - helpLastY);
+    helpScroll = Math.max(0, Math.min(helpScroll, 33 * 45 - H + 150));
+    helpLastY = y;
   }
-},{passive:true});
+});
 
-// ═══════════════════════════════════════════
-//  MAIN LOOP
-// ═══════════════════════════════════════════
-function loop(){
+canvas.addEventListener('pointerup', () => { helpDragging = false; });
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') {
+    e.preventDefault();
+    if (screen === 'runner') jump();
+    else if (screen === 'gameover') restartRunner();
+  }
+});
+
+// ==================== ГЛАВНЫЙ ЦИКЛ ====================
+function loop() {
   frame++;
-  cx.clearRect(0,0,W,H);
+  ctx.clearRect(0, 0, W, H);
 
-  switch(screen){
-    case 'menu':      drawMenu(); break;
-    case 'quiz-select': drawQuizSelect(); break;
-    case 'quiz':
-      drawQuiz();
-      if(qResult!==null){ qResultT--; if(qResultT<=0){ qResult=null; qQuestion=genQuestion(qDiff); } }
-      updateParticles(); drawParticles();
-      break;
-    case 'runner':
-      runSpeed = (W * 0.008 + score * 0.04) * SPEED_STEPS[speedIdx];
-      drawWorld();
-      updateSpecials(); drawSpecialObjects();
-      updateDust(); drawDust();
-      P.update(); updateBlocks(); updateHearts();
-      blocks.forEach(drawBlock); drawHearts();
-      P.draw();
-      updateParticles(); drawParticles();
-      drawHUD();
-      // death flash + transition (no setTimeout — pure frame counter)
-      if(deathFrame>=0){
-        const flashA = Math.max(0, 0.55*(1-deathFrame/20));
-        cx.fillStyle=`rgba(255,0,0,${flashA})`; cx.fillRect(0,0,W,H);
-        deathFrame++;
-        if(deathFrame>=20){ screen='gameover'; deathFrame=-1; }
-      }
-      break;
-    case 'gameover':
-      drawGameOver();
-      updateParticles(); drawParticles();
-      break;
-    case 'ref':
-      drawRef();
-      break;
-  }
+  if (screen === 'menu') { updateMenu(); drawMenu(); }
+  else if (screen === 'difficulty') { drawDifficulty(); }
+  else if (screen === 'runner') { updateRunner(); drawRunner(); }
+  else if (screen === 'quiz') { updateQuiz(); drawQuiz(); }
+  else if (screen === 'help') { drawHelp(); }
+  else if (screen === 'gameover') { drawGameOver(); }
 
   requestAnimationFrame(loop);
 }
 
-function drawSpecialObjects(){ drawSpecials(); }
-
-initMenuOrbs();
 loop();
 </script>
 </body>
