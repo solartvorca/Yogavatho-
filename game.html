@@ -48,11 +48,15 @@ const cx = cv.getContext('2d');
 let W=0, H=0, GY=0;
 
 function resize(){
-  W = cv.width  = cv.offsetWidth  * devicePixelRatio;
-  H = cv.height = cv.offsetHeight * devicePixelRatio;
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cv.width  = Math.round(W * DPR);
+  cv.height = Math.round(H * DPR);
+  cv.style.width  = W + 'px';
+  cv.style.height = H + 'px';
+  cx.setTransform(DPR, 0, 0, DPR, 0, 0);
   GY = H * 0.76;
-  cv.style.width  = cv.offsetWidth  + 'px';
-  cv.style.height = cv.offsetHeight + 'px';
 }
 window.addEventListener('resize', resize);
 resize();
@@ -120,7 +124,7 @@ function drawShape(shape,px,py,r,fill,stroke){
 //  PLAYER — точка света
 // ═══════════════════════════════════════════
 const P = {
-  x:0, y:0, vy:0, r:14,
+  x:0, y:0, vy:0, r:18,
   letter:'А', jumps:0,
   trail:[], glow:0, flash:0,
   onGround:true, runStep:0,
