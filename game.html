@@ -73,7 +73,8 @@ let runSpeed=4;
 
 const SPEED_STEPS  = [0.6, 1, 1.6, 2.4, 3.5];
 const SPEED_LABELS = ['0.6×', '1×', '1.6×', '2.4×', '3.5×'];
-let speedIdx = 2; // default 1.6× — feels like dino game
+let speedIdx = 2;
+let dyingTimer = false; // guard against stale gameover setTimeout
 
 // quiz
 let qDiff=1, qScore=0, qStreak=0;
@@ -244,7 +245,10 @@ function updateBlocks(){
         lives--;
         P.flash=1;
         addParticles(P.x,P.y,'#ff4444',8);
-        if(lives<=0) setTimeout(()=>{ screen='gameover'; },600);
+        if(lives<=0 && !dyingTimer){
+          dyingTimer=true;
+          setTimeout(()=>{ dyingTimer=false; if(screen==='runner') screen='gameover'; }, 300);
+        }
       }
     }
   });
@@ -443,89 +447,123 @@ function drawWorld(){
 //  HUD
 // ═══════════════════════════════════════════
 function drawHUD(){
-  const lc = LETTER_MAP[P.letter]?.code||1;
+  const lc  = LETTER_MAP[P.letter]?.code || 1;
   const col = CODE_COLOR[lc];
 
-  // score
+  // score — top left
   cx.save();
-  cx.font=pxFont(H*0.032); cx.fillStyle='#ffd700';
-  cx.textAlign='left'; cx.shadowColor='#ffd700'; cx.shadowBlur=10;
-  cx.fillText('✦ '+score, W*0.04, H*0.055);
-  cx.font=pxFont(H*0.018); cx.fillStyle='rgba(255,215,0,0.5)'; cx.shadowBlur=0;
-  cx.fillText('РЕК: '+hiScore, W*0.04, H*0.082);
+  cx.font=pxFont(H*0.03); cx.fillStyle='#ffd700';
+  cx.textAlign='left'; cx.shadowColor='#ffd700'; cx.shadowBlur=8;
+  cx.fillText('✦ '+score, W*0.03, H*0.048);
+  cx.font=pxFont(H*0.016); cx.fillStyle='rgba(255,215,0,0.45)'; cx.shadowBlur=0;
+  cx.fillText('РЕК: '+hiScore, W*0.03, H*0.072);
   cx.restore();
 
-  // lives
+  // lives — top right
   for(let i=0;i<3;i++){
     cx.save();
     cx.globalCompositeOperation='lighter';
-    cx.fillStyle = i<lives ? '#ff6b9d' : '#222';
+    cx.fillStyle = i<lives ? '#ff6b9d' : '#333';
     cx.shadowColor = i<lives ? '#ff6b9d' : 'transparent';
-    cx.shadowBlur = i<lives ? 12 : 0;
-    cx.beginPath(); cx.arc(W-W*0.05-i*W*0.065, H*0.055, H*0.018, 0, Math.PI*2); cx.fill();
+    cx.shadowBlur  = i<lives ? 12 : 0;
+    cx.beginPath(); cx.arc(W-W*0.05-i*W*0.065, H*0.048, H*0.016, 0, Math.PI*2); cx.fill();
     cx.restore();
   }
 
-  // current letter hint
+  // ── FULL CODE TABLE ─────────────────────────
+  const ty    = H*0.085;   // table top y
+  const th    = H*0.082;   // table height
+  const cellW = W / 9;
+
   cx.save();
-  cx.font=pxFont(H*0.018); cx.fillStyle='rgba(255,255,255,0.6)';
+  // strip background
+  cx.fillStyle='rgba(0,0,12,0.6)';
+  cx.fillRect(0, ty - H*0.006, W, th + H*0.025);
+
+  // "твоя буква → ищи код:" label
+  cx.font=pxFont(H*0.014); cx.fillStyle='rgba(255,255,255,0.4)';
   cx.textAlign='center'; cx.textBaseline='bottom';
-  cx.fillText('найди код для:', W/2, H*0.048);
-  cx.font=pxFont(H*0.042); cx.fillStyle=col;
-  cx.shadowColor=col; cx.shadowBlur=20;
-  cx.textBaseline='top';
-  cx.fillText(P.letter+' → '+lc, W/2, H*0.05);
+  cx.fillText('ТВОЯ БУКВА  '+P.letter+'  →  ИЩЕШЬ КОД  '+lc, W/2, ty - H*0.008);
+
+  for(let code=1; code<=9; code++){
+    const ccx      = (code - 0.5) * cellW;
+    const isTarget = (code === lc);
+    const acol     = CODE_COLOR[code];
+
+    if(isTarget){
+      // highlighted cell
+      cx.fillStyle = acol + '2e';
+      roundRect(ccx - cellW*0.46, ty - H*0.002, cellW*0.92, th + H*0.004, 7);
+      cx.fill();
+      cx.strokeStyle=acol; cx.lineWidth=1.5; cx.stroke();
+      cx.shadowColor=acol; cx.shadowBlur=16;
+    } else {
+      cx.shadowBlur=0;
+    }
+
+    // code digit
+    cx.font=pxFont(isTarget ? H*0.04 : H*0.026);
+    cx.fillStyle = isTarget ? acol : 'rgba(255,215,0,0.3)';
+    cx.textAlign='center'; cx.textBaseline='top';
+    cx.fillText(code, ccx, ty + H*0.005);
+
+    // letters below digit
+    cx.shadowBlur=0;
+    cx.font=pxFont(isTarget ? H*0.016 : H*0.012);
+    cx.fillStyle = isTarget ? '#ffffff' : 'rgba(255,255,255,0.2)';
+    cx.fillText(CODE_LETTERS[code].join(''), ccx, ty + H*0.047);
+  }
   cx.restore();
 
-  // world
-  cx.save(); cx.font=pxFont(H*0.016);
-  cx.fillStyle=WORLDS[worldIdx].acc+'99';
-  cx.textAlign='right'; cx.textBaseline='bottom';
-  cx.fillText(WORLDS[worldIdx].name, W-W*0.03, H*0.09);
+  // world name — small, right side, below table
+  cx.save();
+  cx.font=pxFont(H*0.014); cx.fillStyle=WORLDS[worldIdx].acc+'66';
+  cx.textAlign='right'; cx.textBaseline='top';
+  cx.fillText(WORLDS[worldIdx].name, W-W*0.03, ty+th+H*0.008);
   cx.restore();
 
   // jump hint (first 5 sec)
   if(frame<300){
     cx.save(); cx.globalAlpha=1-frame/300;
-    cx.font=pxFont(H*0.022); cx.fillStyle='rgba(255,255,255,0.7)';
+    cx.font=pxFont(H*0.02); cx.fillStyle='rgba(255,255,255,0.7)';
     cx.textAlign='center'; cx.fillText('TAP / ПРОБЕЛ → ПРЫЖОК', W/2, H*0.92);
     cx.restore();
   }
 
-  // restart button — bottom left
+  // ↺ restart button — bottom left
   const rbw=H*0.1, rbh=H*0.065, rbx=W*0.03, rby=H*0.88;
   hudRestartRect={x:rbx,y:rby,w:rbw,h:rbh};
   cx.save();
   cx.fillStyle='rgba(255,100,100,0.12)'; cx.strokeStyle='rgba(255,100,100,0.5)'; cx.lineWidth=1.5;
   roundRect(rbx,rby,rbw,rbh,rbh/2); cx.fill(); cx.stroke();
-  cx.font=pxFont(H*0.03); cx.fillStyle='rgba(255,160,160,0.85)';
+  cx.font=pxFont(H*0.03); cx.fillStyle='rgba(255,160,160,0.9)';
   cx.textAlign='center'; cx.textBaseline='middle';
-  cx.fillText('↺',rbx+rbw/2,rby+rbh/2);
+  cx.fillText('↺', rbx+rbw/2, rby+rbh/2);
   cx.restore();
 
-  // speed control — bottom right: [◀] 1.6× [▶]
+  // speed control [◀] 1.6× [▶] — bottom right
   const sbh=H*0.065, sbtnW=H*0.075, slabelW=H*0.14;
   const sbBase = W - W*0.03 - sbtnW*2 - slabelW;
-  const sby = H*0.88;
-  hudSpeedMinus={x:sbBase,            y:sby, w:sbtnW,   h:sbh};
-  hudSpeedPlus ={x:sbBase+sbtnW+slabelW, y:sby, w:sbtnW, h:sbh};
+  const sby    = H*0.88;
+  hudSpeedMinus={x:sbBase,                y:sby, w:sbtnW,    h:sbh};
+  hudSpeedPlus ={x:sbBase+sbtnW+slabelW,  y:sby, w:sbtnW,    h:sbh};
 
   cx.save();
-  // minus button
-  cx.fillStyle='rgba(100,180,255,0.12)'; cx.strokeStyle='rgba(100,180,255,0.45)'; cx.lineWidth=1.5;
+  cx.lineWidth=1.5;
+  cx.fillStyle='rgba(100,180,255,0.12)'; cx.strokeStyle='rgba(100,180,255,0.45)';
   roundRect(hudSpeedMinus.x,sby,sbtnW,sbh,sbh/2); cx.fill(); cx.stroke();
-  cx.font=pxFont(H*0.03); cx.fillStyle='rgba(150,210,255,0.9)';
+  cx.font=pxFont(H*0.028); cx.fillStyle='rgba(150,210,255,0.9)';
   cx.textAlign='center'; cx.textBaseline='middle';
   cx.fillText('◀', hudSpeedMinus.x+sbtnW/2, sby+sbh/2);
-  // label
-  cx.font=pxFont(H*0.026); cx.fillStyle='#ffd700';
+
+  cx.font=pxFont(H*0.024); cx.fillStyle='#ffd700';
   cx.shadowColor='#ffd700'; cx.shadowBlur=8;
   cx.fillText(SPEED_LABELS[speedIdx], sbBase+sbtnW+slabelW/2, sby+sbh/2);
   cx.shadowBlur=0;
-  // plus button
+
   cx.fillStyle='rgba(100,180,255,0.12)'; cx.strokeStyle='rgba(100,180,255,0.45)';
   roundRect(hudSpeedPlus.x,sby,sbtnW,sbh,sbh/2); cx.fill(); cx.stroke();
-  cx.fillStyle='rgba(150,210,255,0.9)'; cx.shadowBlur=0;
+  cx.fillStyle='rgba(150,210,255,0.9)';
   cx.fillText('▶', hudSpeedPlus.x+sbtnW/2, sby+sbh/2);
   cx.restore();
 }
@@ -853,33 +891,44 @@ function drawRef(){
 function drawGameOver(){
   cx.fillStyle='rgba(10,10,26,0.97)'; cx.fillRect(0,0,W,H);
   menuBtns=[];
+
   cx.save();
-  cx.font=pxFont(H*0.068); cx.fillStyle='#ff6b9d';
   cx.textAlign='center'; cx.textBaseline='middle';
+
+  cx.font=pxFont(H*0.062); cx.fillStyle='#ff6b9d';
   cx.shadowColor='#ff6b9d'; cx.shadowBlur=35;
-  cx.fillText('ИГРА ОКОНЧЕНА',W/2,H*0.2);
-  cx.font=pxFont(H*0.13); cx.fillStyle='#ffd700';
+  cx.fillText('ИГРА ОКОНЧЕНА', W/2, H*0.19);
+
+  cx.font=pxFont(H*0.12); cx.fillStyle='#ffd700';
   cx.shadowColor='#ffd700'; cx.shadowBlur=45;
-  cx.fillText(score,W/2,H*0.4);
-  cx.font=pxFont(H*0.025); cx.fillStyle='rgba(255,215,0,0.55)'; cx.shadowBlur=0;
-  cx.fillText('РЕКОРД: '+hiScore,W/2,H*0.53);
+  cx.fillText(score, W/2, H*0.38);
+
+  cx.font=pxFont(H*0.024); cx.fillStyle='rgba(255,215,0,0.5)'; cx.shadowBlur=0;
+  cx.fillText('РЕКОРД: '+hiScore, W/2, H*0.51);
   cx.restore();
 
-  // pulsing tap-to-restart prompt (like dino game)
-  const pulse = 0.6 + Math.sin(frame*0.08)*0.4;
+  // big restart button
+  const bw=W*0.74, bh=H*0.105, bx=W/2-bw/2, by=H*0.6;
+  menuBtns.push({x:bx, y:by, w:bw, h:bh, a:'run'});
   cx.save();
-  cx.globalAlpha=pulse;
-  cx.font=pxFont(H*0.036); cx.fillStyle='#ffffff';
+  cx.fillStyle='rgba(255,215,0,0.15)';
+  cx.strokeStyle='#ffd700'; cx.lineWidth=2.5;
+  cx.shadowColor='#ffd700'; cx.shadowBlur=30;
+  roundRect(bx,by,bw,bh,bh/2); cx.fill(); cx.stroke();
+  cx.font=pxFont(H*0.044); cx.fillStyle='#ffd700';
   cx.textAlign='center'; cx.textBaseline='middle';
-  cx.shadowColor='#ffffff'; cx.shadowBlur=20;
-  cx.fillText('↺  КОСНИСЬ ЧТОБЫ ИГРАТЬ СНОВА',W/2,H*0.69);
+  cx.fillText('↺  НАЧАТЬ ЗАНОВО', W/2, by+bh/2);
   cx.restore();
 
-  // small menu link at bottom
+  // menu button
+  const mw=W*0.4, mh=H*0.065, mx=W/2-mw/2, my=H*0.78;
+  menuBtns.push({x:mx, y:my, w:mw, h:mh, a:'menu'});
   cx.save();
-  cx.font=pxFont(H*0.018); cx.fillStyle='rgba(255,215,0,0.3)';
-  cx.textAlign='center'; cx.fillText('← меню',W/2,H*0.92);
-  menuBtns.push({x:W*0.3,y:H*0.88,w:W*0.4,h:H*0.07,a:'menu'});
+  cx.fillStyle='rgba(255,215,0,0.05)'; cx.strokeStyle='rgba(255,215,0,0.2)'; cx.lineWidth=1;
+  roundRect(mx,my,mw,mh,mh/2); cx.fill(); cx.stroke();
+  cx.font=pxFont(H*0.024); cx.fillStyle='rgba(255,215,0,0.35)';
+  cx.textAlign='center'; cx.textBaseline='middle';
+  cx.fillText('◀ МЕНЮ', W/2, my+mh/2);
   cx.restore();
 }
 
@@ -928,7 +977,10 @@ function onTap(ex,ey){
   }
 
   if(screen==='gameover'){
-    doMenuAction('run'); return;
+    let handled=false;
+    menuBtns.forEach(b=>{ if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){ doMenuAction(b.a); handled=true; } });
+    if(!handled) doMenuAction('run');
+    return;
   }
 
   if(screen==='menu'){
@@ -983,6 +1035,7 @@ function onTap(ex,ey){
 function doMenuAction(a){
   switch(a){
     case 'run':
+      dyingTimer=false;
       score=0; lives=3; blocks=[]; particles=[]; specials=[]; dustParts=[];
       spawnT=0; spawnI=80; specT=0; frame=0; transitioning=false; runSpeed=3.5;
       worldIdx=rndI(WORLDS.length);
