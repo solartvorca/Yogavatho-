@@ -1,0 +1,1772 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0a0a1a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="preconnect" href="https://vk.com" crossorigin>
+    <link rel="dns-prefetch" href="//vk.com">
+    <title>Прана: Сакральный Код</title>
+    <style>
+        :root {
+            --bg-deep: #0a0a1a;
+            --bg-mid: #1a0a2e;
+            --bg-light: #2d1b4e;
+            --gold: #ffd700;
+            --gold-soft: #ffec8b;
+            --amber: #ffbf00;
+            --rose: #ff6b9d;
+            --indigo: #4b0082;
+            --violet: #8b5cf6;
+            --violet-deep: #6d28d9;
+            --cyan: #00d4aa;
+            --correct: #00d4aa;
+            --glow-gold: rgba(255, 215, 0, 0.6);
+            --glow-amber: rgba(255, 191, 0, 0.4);
+            --glow-violet: rgba(139, 92, 246, 0.5);
+            color-scheme: dark;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background: radial-gradient(ellipse at center, var(--bg-mid) 0%, var(--bg-deep) 100%);
+            color: var(--gold-soft);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            contain: layout style paint;
+        }
+
+        .particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: var(--gold);
+            border-radius: 50%;
+            opacity: 0;
+            animation: float-particle 10s infinite ease-in-out;
+        }
+
+        @keyframes float-particle {
+            0%, 100% { opacity: 0; transform: translate3d(0, 100vh, 0) scale(0); }
+            10% { opacity: 0.6; }
+            90% { opacity: 0.6; }
+            50% { transform: translate3d(0, -10vh, 0) scale(1); }
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: linear-gradient(180deg, rgba(26,10,46,0.95) 0%, rgba(10,10,26,0.9) 100%);
+            border-bottom: 1px solid rgba(255,215,0,0.3);
+            height: 60px;
+            flex-shrink: 0;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+            contain: layout;
+        }
+
+        .prana-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.2rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            text-shadow: 0 0 20px var(--glow-gold);
+        }
+
+        .prana-display span {
+            color: var(--gold);
+            font-weight: 600;
+            font-size: 1.4rem;
+        }
+
+        #status-label {
+            color: var(--amber);
+            font-size: 12px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            text-shadow: 0 0 15px var(--glow-amber);
+            font-weight: 300;
+        }
+
+        .top-bar button {
+            background: rgba(255,215,0,0.1);
+            border: 1px solid rgba(255,215,0,0.4);
+            color: var(--gold-soft);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 10px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: background 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .top-bar button:hover {
+            background: rgba(255,215,0,0.25);
+            box-shadow: 0 0 20px var(--glow-gold);
+        }
+
+        .top-bar button.active {
+            background: rgba(255,215,0,0.3);
+            box-shadow: 0 0 15px var(--glow-gold);
+        }
+
+        .nav-menu {
+            display: flex;
+            overflow-x: auto;
+            background: rgba(10,10,26,0.85);
+            padding: 10px 15px;
+            gap: 8px;
+            height: 55px;
+            flex-shrink: 0;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(255,215,0,0.15);
+            scrollbar-width: thin;
+            scrollbar-color: var(--gold) transparent;
+            contain: layout;
+        }
+
+        .nav-menu::-webkit-scrollbar { height: 3px; }
+        .nav-menu::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 3px; }
+
+        .nav-menu button {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,215,0,0.25);
+            color: rgba(255,236,139,0.7);
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-size: 10px;
+            white-space: nowrap;
+            letter-spacing: 1px;
+            transition: background 0.3s ease, border-color 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .nav-menu button:hover {
+            background: rgba(255,215,0,0.15);
+            border-color: rgba(255,215,0,0.5);
+        }
+
+        .nav-menu button.active {
+            background: linear-gradient(135deg, rgba(255,215,0,0.3) 0%, rgba(255,191,0,0.2) 100%);
+            color: var(--gold);
+            font-weight: 500;
+            border-color: var(--gold);
+            box-shadow: 0 0 25px var(--glow-gold);
+        }
+
+        .c1 { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); color: #fff; }
+        .c2 { background: linear-gradient(135deg, #ffd93d, #ffcd00); color: #1a1a2e; }
+        .c3 { background: linear-gradient(135deg, #6bcf7f, #4caf50); color: #fff; }
+        .c4 { background: linear-gradient(135deg, #4ecdc4, #26a69a); color: #fff; }
+        .c5 { background: linear-gradient(135deg, #45b7d1, #2196f3); color: #fff; }
+        .c6 { background: linear-gradient(135deg, #96ceb4, #81c784); color: #1a1a2e; }
+        .c7 { background: linear-gradient(135deg, #dfe6e9, #b0bec5); color: #1a1a2e; }
+        .c8 { background: linear-gradient(135deg, #fd79a8, #e91e63); color: #fff; }
+        .c9 { background: linear-gradient(135deg, #a29bfe, #7c4dff); color: #fff; }
+
+        .shape {
+            width: 55px;
+            height: 55px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            position: relative;
+            margin: 5px;
+            transition: transform 0.3s ease;
+            z-index: 1;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .shape:hover { transform: scale(1.05); }
+
+        .s0 { border-radius: 50%; }
+        .s1 { border-radius: 12px; }
+        .s2 { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); padding-top: 10px; height: 45px; }
+        .s3 { transform: rotate(45deg); width: 40px; height: 40px; }
+        .s3 span { transform: rotate(-45deg); display: block; }
+
+        #viewport {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 5vh;
+            overflow: hidden;
+            z-index: 1;
+            contain: layout;
+        }
+
+        #flower-svg-container {
+            width: 70%;
+            max-width: 320px;
+            cursor: pointer;
+            z-index: 5;
+            filter: drop-shadow(0 0 30px var(--glow-gold));
+            animation: flower-breathe 8s ease-in-out infinite;
+            margin-bottom: 20px;
+            will-change: transform, filter;
+        }
+
+        #flower-svg-container:hover {
+            filter: drop-shadow(0 0 50px var(--glow-gold));
+        }
+
+        @keyframes flower-breathe {
+            0%, 100% {
+                transform: scale(0.9);
+                filter: drop-shadow(0 0 20px var(--glow-gold)) drop-shadow(0 0 40px var(--glow-amber));
+            }
+            50% {
+                transform: scale(1.1);
+                filter: drop-shadow(0 0 40px var(--glow-gold)) drop-shadow(0 0 80px var(--glow-amber)) brightness(1.2);
+            }
+        }
+
+        .flower-svg {
+            width: 100%;
+            height: 100%;
+            stroke: var(--gold);
+            fill: none;
+            stroke-width: 0.5;
+        }
+
+        .prana-glow {
+            animation: pulse-glow 1.5s ease-out;
+        }
+
+        @keyframes pulse-glow {
+            0% { filter: drop-shadow(0 0 20px var(--glow-gold)) drop-shadow(0 0 40px var(--glow-amber)); }
+            50% { filter: drop-shadow(0 0 60px var(--gold)) drop-shadow(0 0 100px var(--amber)) brightness(1.8); transform: scale(1.03); }
+            100% { filter: drop-shadow(0 0 20px var(--glow-gold)) drop-shadow(0 0 40px var(--glow-amber)); }
+        }
+
+        #game-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, var(--bg-mid) 0%, var(--bg-deep) 100%);
+            display: none;
+            flex-direction: column;
+            z-index: 100;
+            contain: layout;
+        }
+
+        #game-display {
+            height: 35%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,215,0,0.2);
+            padding: 20px;
+            box-sizing: border-box;
+            background: linear-gradient(180deg, rgba(26,10,46,0.5) 0%, transparent 100%);
+            contain: layout;
+        }
+
+        #numpad-zone {
+            height: 65%;
+            background: rgba(10,10,26,0.4);
+            padding: 20px;
+            overflow-y: auto;
+            box-sizing: border-box;
+            contain: layout;
+        }
+
+        .grid-num {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+
+        .grid-options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+
+        .grid-alpha {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .k {
+            background: linear-gradient(135deg, rgba(255,215,0,0.1) 0%, rgba(255,191,0,0.05) 100%);
+            border: 1px solid rgba(255,215,0,0.3);
+            color: var(--gold-soft);
+            padding: 20px 0;
+            border-radius: 15px;
+            font-size: 1.5rem;
+            touch-action: manipulation;
+            font-weight: 500;
+            transition: background 0.15s ease, box-shadow 0.15s ease;
+            text-shadow: 0 0 10px var(--glow-gold);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .k:hover {
+            background: linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(255,191,0,0.1) 100%);
+            border-color: rgba(255,215,0,0.5);
+            box-shadow: 0 0 20px var(--glow-gold);
+        }
+
+        .k:active {
+            background: linear-gradient(135deg, rgba(255,215,0,0.3) 0%, rgba(255,191,0,0.2) 100%);
+            color: var(--gold);
+            transform: scale(0.97);
+            box-shadow: 0 0 30px var(--glow-gold);
+        }
+
+        .settings-panel {
+            background: linear-gradient(180deg, rgba(26,10,46,0.9) 0%, rgba(10,10,26,0.95) 100%);
+            border-top: 1px solid rgba(255,215,0,0.2);
+            padding: 10px 15px;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            height: 65px;
+            flex-shrink: 0;
+            z-index: 10;
+            contain: layout;
+        }
+
+        .settings-panel input {
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,215,0,0.3);
+            color: var(--gold);
+            text-align: center;
+            border-radius: 10px;
+            font-size: 12px;
+            padding: 8px;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .settings-panel input:focus {
+            outline: none;
+            border-color: var(--gold);
+            box-shadow: 0 0 15px var(--glow-gold);
+        }
+
+        #ref-modal, #intro-modal, #meditation-text-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, var(--bg-mid) 0%, var(--bg-deep) 100%);
+            z-index: 5000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            box-sizing: border-box;
+            text-align: center;
+            overflow-y: auto;
+            contain: layout;
+        }
+
+        .mode-desc {
+            font-size: 0.9rem;
+            color: var(--amber);
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid rgba(255,215,0,0.2);
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+            line-height: 1.5;
+            max-width: 400px;
+        }
+
+        #video-container {
+            position: fixed;
+            top: 70px;
+            left: 10px;
+            width: 180px;
+            height: 100px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,215,0,0.4);
+            z-index: 200;
+            display: none;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            contain: layout;
+        }
+
+        #video-container iframe { width: 100%; height: 100%; border: none; }
+
+        .video-close {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(255,107,157,0.9);
+            color: white;
+            border: none;
+            font-size: 10px;
+            cursor: pointer;
+            z-index: 210;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #breath-label {
+            font-size: 1.3rem;
+            color: var(--gold);
+            letter-spacing: 6px;
+            text-shadow: 0 0 30px var(--glow-gold);
+            font-weight: 300;
+            margin-top: 10px;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            z-index: 5;
+        }
+
+        #breath-label.visible { opacity: 1; }
+
+        .intro-content {
+            max-width: 600px;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .intro-content h1 {
+            color: var(--gold);
+            font-size: 2.5rem;
+            font-weight: 300;
+            letter-spacing: 8px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 40px var(--glow-gold);
+        }
+
+        .intro-content p {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: rgba(255,236,139,0.8);
+            margin-bottom: 20px;
+            font-weight: 300;
+        }
+
+        .intro-content b { color: var(--gold); font-weight: 500; }
+
+        .start-btn {
+            width: 100%;
+            max-width: 300px;
+            background: linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(255,191,0,0.1) 100%);
+            border: 1px solid rgba(255,215,0,0.5);
+            color: var(--gold);
+            padding: 18px 40px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 500;
+            letter-spacing: 3px;
+            cursor: pointer;
+            transition: background 0.4s ease, box-shadow 0.4s ease, transform 0.4s ease;
+            margin-top: 30px;
+            text-shadow: 0 0 15px var(--glow-gold);
+        }
+
+        .start-btn:hover {
+            background: linear-gradient(135deg, rgba(255,215,0,0.3) 0%, rgba(255,191,0,0.2) 100%);
+            box-shadow: 0 0 40px var(--glow-gold);
+            transform: translateY(-2px);
+        }
+
+        #ref-content {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .ref-item {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,215,0,0.2);
+            padding: 15px;
+            text-align: center;
+            border-radius: 12px;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+
+        .ref-item:hover {
+            background: rgba(255,215,0,0.1);
+            border-color: rgba(255,215,0,0.4);
+        }
+
+        .ref-item .shape { margin: 10px auto; }
+
+        #flash-msg { background: rgba(10,10,26,0.98); }
+
+        #msg-text {
+            color: var(--gold);
+            font-size: 1.4rem;
+            font-weight: 300;
+            letter-spacing: 3px;
+            text-shadow: 0 0 40px var(--glow-gold);
+            line-height: 1.6;
+            max-width: 80%;
+        }
+
+        .flower-circles circle {
+            animation: circle-glow 3s ease-in-out infinite;
+        }
+
+        .flower-circles circle:nth-child(odd) { animation-delay: 0s; }
+        .flower-circles circle:nth-child(even) { animation-delay: 1.5s; }
+
+        @keyframes circle-glow {
+            0%, 100% { stroke-opacity: 0.6; stroke-width: 0.4; }
+            50% { stroke-opacity: 1; stroke-width: 0.8; }
+        }
+
+        .controls-container {
+            position: absolute;
+            bottom: 90px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .controls-container > * { pointer-events: auto; }
+
+        .reverse-toggle {
+            background: rgba(255,215,0,0.1);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 25px;
+            padding: 10px 25px;
+            font-size: 11px;
+            color: var(--gold-soft);
+            cursor: pointer;
+            transition: background 0.3s ease, border-color 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            letter-spacing: 2px;
+            min-width: 220px;
+        }
+
+        .reverse-toggle:hover {
+            background: rgba(255,215,0,0.2);
+            border-color: rgba(255,215,0,0.5);
+        }
+
+        .reverse-toggle.active {
+            background: rgba(139,92,246,0.2);
+            border-color: var(--violet);
+            color: var(--violet);
+        }
+
+        .reverse-toggle .main-text::before { content: '○ '; font-size: 14px; }
+        .reverse-toggle.active .main-text::before { content: '● '; }
+
+        .reverse-toggle .hint {
+            font-size: 9px;
+            opacity: 0.7;
+            letter-spacing: 1px;
+            line-height: 1.3;
+            text-align: center;
+            max-width: 200px;
+        }
+
+        .sensory-toggle {
+            background: rgba(255,215,0,0.1);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 25px;
+            padding: 8px 20px;
+            font-size: 11px;
+            color: var(--gold-soft);
+            cursor: pointer;
+            transition: background 0.3s ease, border-color 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: 2px;
+        }
+
+        .sensory-toggle:hover {
+            background: rgba(255,215,0,0.2);
+            border-color: rgba(255,215,0,0.5);
+        }
+
+        .sensory-toggle.active {
+            background: rgba(0,212,170,0.2);
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .sensory-toggle::before { content: '○'; font-size: 14px; }
+        .sensory-toggle.active::before { content: '●'; }
+
+        .t9-keyboard {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+
+        .t9-key {
+            background: linear-gradient(135deg, rgba(255,215,0,0.1) 0%, rgba(255,191,0,0.05) 100%);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 15px;
+            padding: 12px 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.15s ease, box-shadow 0.15s ease;
+            position: relative;
+            min-height: 70px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .t9-key:hover {
+            background: linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(255,191,0,0.1) 100%);
+            border-color: rgba(255,215,0,0.5);
+        }
+
+        .t9-key:active, .t9-key.active {
+            background: linear-gradient(135deg, rgba(255,215,0,0.35) 0%, rgba(255,191,0,0.2) 100%);
+            border-color: var(--gold);
+            box-shadow: 0 0 25px var(--glow-gold);
+            transform: scale(0.98);
+        }
+
+        .t9-key .number {
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: var(--gold);
+            text-shadow: 0 0 10px var(--glow-gold);
+            margin-bottom: 4px;
+        }
+
+        .t9-key .letters {
+            font-size: 0.75rem;
+            color: rgba(255,236,139,0.7);
+            letter-spacing: 1px;
+            line-height: 1.2;
+        }
+
+        .t9-key .current-letter {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: var(--gold);
+            color: var(--bg-deep);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1rem;
+            box-shadow: 0 0 15px var(--glow-gold);
+            animation: pulse-letter 0.3s ease;
+        }
+
+        @keyframes pulse-letter {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .t9-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            justify-content: center;
+        }
+
+        .t9-control-btn {
+            background: rgba(255,107,157,0.2);
+            border: 1px solid rgba(255,107,157,0.4);
+            color: var(--rose);
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.3s ease, box-shadow 0.3s ease;
+            min-width: 80px;
+        }
+
+        .t9-control-btn:hover {
+            background: rgba(255,107,157,0.3);
+            box-shadow: 0 0 15px rgba(255,107,157,0.4);
+        }
+
+        .t9-control-btn.primary {
+            background: rgba(0,212,170,0.2);
+            border-color: rgba(0,212,170,0.4);
+            color: var(--cyan);
+        }
+
+        .t9-control-btn.primary:hover {
+            background: rgba(0,212,170,0.3);
+            box-shadow: 0 0 15px rgba(0,212,170,0.4);
+        }
+
+        .t9-display {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 15px;
+            padding: 15px 20px;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            color: var(--gold);
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px var(--glow-gold);
+            flex-wrap: wrap;
+            word-break: break-all;
+            max-width: 90%;
+        }
+
+        .t9-display .cursor {
+            animation: blink 1s infinite;
+            color: var(--amber);
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .t9-target { font-size: 1.1rem; color: rgba(255,236,139,0.6); margin-bottom: 10px; letter-spacing: 1px; }
+        .t9-progress { font-size: 0.85rem; color: var(--amber); margin-top: 8px; }
+
+        .t9-shape-preview {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 200;
+            animation: t9-shape-appear 0.5s ease-out;
+            pointer-events: none;
+        }
+
+        @keyframes t9-shape-appear {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .t9-shape-preview.fade-out {
+            animation: t9-shape-fade 0.3s ease-out forwards;
+        }
+
+        @keyframes t9-shape-fade {
+            to { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+
+        .meditation-text-area {
+            width: 100%;
+            max-width: 500px;
+            min-height: 200px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 15px;
+            padding: 15px;
+            color: var(--gold-soft);
+            font-size: 14px;
+            line-height: 1.6;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+
+        .meditation-text-area:focus {
+            outline: none;
+            border-color: var(--gold);
+            box-shadow: 0 0 20px var(--glow-gold);
+        }
+
+        .meditation-text-area::placeholder { color: rgba(255,236,139,0.4); }
+
+        .meditation-btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .meditation-btn {
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-size: 12px;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: background 0.3s ease, box-shadow 0.3s ease;
+            border: 1px solid;
+        }
+
+        .meditation-btn.primary {
+            background: rgba(0,212,170,0.2);
+            border-color: rgba(0,212,170,0.4);
+            color: var(--cyan);
+        }
+
+        .meditation-btn.primary:hover {
+            background: rgba(0,212,170,0.3);
+            box-shadow: 0 0 20px rgba(0,212,170,0.4);
+        }
+
+        .meditation-btn.secondary {
+            background: rgba(255,215,0,0.1);
+            border-color: rgba(255,215,0,0.4);
+            color: var(--gold-soft);
+        }
+
+        .meditation-btn.secondary:hover {
+            background: rgba(255,215,0,0.2);
+            box-shadow: 0 0 20px var(--glow-gold);
+        }
+
+        .meditation-hint {
+            font-size: 0.8rem;
+            color: rgba(255,236,139,0.5);
+            margin-top: 15px;
+            max-width: 400px;
+            line-height: 1.5;
+        }
+
+        .load-text-btn {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(139,92,246,0.2);
+            border: 1px solid rgba(139,92,246,0.4);
+            color: var(--violet);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 10px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: background 0.3s ease, box-shadow 0.3s ease;
+            z-index: 110;
+        }
+
+        .load-text-btn:hover {
+            background: rgba(139,92,246,0.3);
+            box-shadow: 0 0 15px var(--glow-violet);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="particles" id="particles"></div>
+
+<div id="intro-modal">
+    <div class="intro-content">
+        <h1>ПРАНА</h1>
+        <p>Практика развития <b>нейронных связей</b> и осознанного дыхания.</p>
+        <p><b>Реверсия:</b> Есть те, кто вдыхает [мысленно] в выдох и выдыхает [мысленно] во вдох. Это нейтрализует животный рефлекс.</p>
+        <p style="font-size: 0.9rem; color: rgba(255,236,139,0.6); margin-top: 30px;">(Бхагавад Гита 4.25-29)</p>
+        <button class="start-btn" id="start-btn">ВОЙТИ В ПОТОК</button>
+    </div>
+</div>
+
+<div class="top-bar">
+    <div class="prana-display">✨ <span id="prana-val">0</span></div>
+    <div id="status-label">ВДОХ</div>
+    <div style="display: flex; gap: 8px;">
+        <button id="btn-video">ВИДЕО</button>
+        <button id="btn-ref">СПРАВКА</button>
+    </div>
+</div>
+
+<div class="nav-menu">
+    <button id="btn-home" class="active">ДЫХАНИЕ</button>
+    <button data-mode="1">МЕДИТАЦИЯ</button>
+    <button data-mode="2">СИМВОЛ</button>
+    <button data-mode="3">АРИФМЕТИКА</button>
+    <button data-mode="4">ВЕС СЛОВА</button>
+    <button data-mode="5">Т9</button>
+</div>
+
+<div id="viewport">
+    <div id="flower-svg-container">
+        <svg id="main-svg" class="flower-svg" viewBox="0 0 100 100">
+            <g id="flower-geometry" class="flower-circles">
+                <circle cx="50" cy="50" r="48" stroke-width="0.2"/>
+                <circle cx="50" cy="50" r="15.5"/>
+                <circle cx="50" cy="34.5" r="15.5"/>
+                <circle cx="50" cy="65.5" r="15.5"/>
+                <circle cx="36.5" cy="42.2" r="15.5"/>
+                <circle cx="63.5" cy="42.2" r="15.5"/>
+                <circle cx="36.5" cy="57.8" r="15.5"/>
+                <circle cx="63.5" cy="57.8" r="15.5"/>
+                <circle cx="50" cy="19" r="15.5"/>
+                <circle cx="50" cy="81" r="15.5"/>
+                <circle cx="23" cy="34.5" r="15.5"/>
+                <circle cx="77" cy="34.5" r="15.5"/>
+                <circle cx="23" cy="65.5" r="15.5"/>
+                <circle cx="77" cy="65.5" r="15.5"/>
+                <circle cx="36.5" cy="26.8" r="15.5"/>
+                <circle cx="63.5" cy="26.8" r="15.5"/>
+                <circle cx="36.5" cy="73.2" r="15.5"/>
+                <circle cx="63.5" cy="73.2" r="15.5"/>
+            </g>
+        </svg>
+    </div>
+
+    <div id="breath-label">ВДОХ</div>
+
+    <div class="controls-container">
+        <div class="reverse-toggle" id="reverse-toggle">
+            <span class="main-text">РЕВЕРСИЯ</span>
+            <span class="hint">Во время физического выдоха — мысленный вдох</span>
+        </div>
+
+        <div class="sensory-toggle" id="sensory-toggle">
+            НАПОМИНАНИЯ
+        </div>
+    </div>
+
+    <div id="game-layer">
+        <button class="load-text-btn" id="load-text-btn" style="display:none;">ЗАГРУЗИТЬ ТЕКСТ</button>
+        <div id="game-display">
+            <div id="task-content"></div>
+            <div id="input-buffer" style="font-size: 2.2rem; color: var(--gold); margin-top: 15px; min-height: 2.5rem; text-shadow: 0 0 20px var(--glow-gold);"></div>
+        </div>
+        <div id="numpad-zone"><div id="keys-container"></div></div>
+        <button id="btn-exit-game" style="position:absolute; top:15px; right:15px; background:rgba(255,215,0,0.1); border:1px solid rgba(255,215,0,0.4); color:var(--gold-soft); padding:10px 15px; border-radius:25px; font-size:11px; letter-spacing:1px; cursor:pointer; transition:all 0.3s;">ВЫХОД</button>
+    </div>
+</div>
+
+<div id="video-container">
+    <button class="video-close" id="btn-video-close">×</button>
+    <iframe id="vk-video" src="" allow="autoplay; encrypted-media; fullscreen" frameborder="0" loading="lazy"></iframe>
+</div>
+
+<div class="settings-panel">
+    <div><input type="number" id="t-in" value="4" placeholder="Вдох"></div>
+    <div><input type="number" id="t-p1" value="0" placeholder="Пауза"></div>
+    <div><input type="number" id="t-out" value="4" placeholder="Выдох"></div>
+    <div><input type="number" id="t-p2" value="0" placeholder="Пауза"></div>
+    <div><input type="number" id="t-freq" value="3" placeholder="Частота"></div>
+</div>
+
+<div id="ref-modal" style="display:none;">
+    <h3 style="color:var(--gold); text-align:center; font-weight:300; letter-spacing:4px; margin-bottom:30px; text-shadow:0 0 30px var(--glow-gold);">Таблица Нейро-Кодов</h3>
+    <div id="ref-content"></div>
+    <button id="btn-close-ref" style="width:100%; max-width:300px; margin-top:30px; padding:15px; background:linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(255,191,0,0.1) 100%); border:1px solid rgba(255,215,0,0.4); color:var(--gold); border-radius:30px; font-weight:500; letter-spacing:2px; cursor:pointer; transition:all 0.3s;">ЗАКРЫТЬ</button>
+</div>
+
+<div id="meditation-text-modal" style="display:none;">
+    <h3 style="color:var(--gold); text-align:center; font-weight:300; letter-spacing:4px; margin-bottom:20px; text-shadow:0 0 30px var(--glow-gold);">Текст для медитации</h3>
+    <textarea class="meditation-text-area" id="meditation-text-input" placeholder="Введите свой текст для медитации..."></textarea>
+    <div class="meditation-btn-group">
+        <button class="meditation-btn primary" id="btn-save-text">СОХРАНИТЬ</button>
+        <button class="meditation-btn secondary" id="btn-reset-text">СТАНДАРТНЫЙ</button>
+        <button class="meditation-btn secondary" id="btn-cancel-text">ОТМЕНА</button>
+    </div>
+    <p class="meditation-hint">Текст будет разбит на фразы по точкам и запятым. Каждая фраза будет показана в игре по очереди.</p>
+</div>
+
+<div id="flash-msg" style="position:fixed; top:0; left:0; width:100%; height:100%; display:none; z-index:6000; align-items:center; justify-content:center; text-align:center; padding:20px; cursor:pointer;">
+    <h2 id="msg-text"></h2>
+</div>
+
+<script>
+const CONFIG = {
+    1: ['И','С','Э'],
+    2: ['А','Й','П','Т'],
+    3: ['Б','З','М','Ю'],
+    4: ['В','К','Ф','Я'],
+    5: ['Д','Л','Х','Ы'],
+    6: ['Е','О','Ц','Ь'],
+    7: ['Ё','Н','Ъ'],
+    8: ['Г','У','Ч','Щ'],
+    9: ['Ж','Р','Ш']
+};
+
+const shapes = ['s0','s1','s2','s3'];
+
+const T9_CONFIG = {
+    1: { letters: ['И', 'С', 'Э'], label: 'ИСЭ' },
+    2: { letters: ['А', 'Й', 'П', 'Т'], label: 'АЙПТ' },
+    3: { letters: ['Б', 'З', 'М', 'Ю'], label: 'БЗМЮ' },
+    4: { letters: ['В', 'К', 'Ф', 'Я'], label: 'ВКФЯ' },
+    5: { letters: ['Д', 'Л', 'Х', 'Ы'], label: 'ДЛХЫ' },
+    6: { letters: ['Е', 'О', 'Ц', 'Ь'], label: 'ЕОЦЬ' },
+    7: { letters: ['Ё', 'Н', 'Ъ'], label: 'ЁНЪ' },
+    8: { letters: ['Г', 'У', 'Ч', 'Щ'], label: 'ГУЧЩ' },
+    9: { letters: ['Ж', 'Р', 'Ш'], label: 'ЖРШ' }
+};
+
+const DEFAULT_MEDITATION_TEXT = `Чистый дух. Всё и ничто. Истина пустота. И ничего. Живо бытие. Ибо Свобода Простора. Отсутствие я. Осознание своей природы дома. Звука неделимого. О Единое. В центре Господь Простора. Север Юг. Запад восток. Присутствие Вечное. Сил совершенное. Сей Ничто что возможно почувствовать. И познать направить внимание описав. Чистое осознавание истиной природы тишина. Безмолвие Простора. Эй Чем ты осознаёшь всё и ничто. Осознавание осознания себя есть. Просто есть сердце. Нежно Свидетель чувств настоящего. Не рождённое ничего. Потенциал чистый дух. Просто Ра. Свет знания. Квантовое сознание. Кто Абсолют. Единое космическое. Осознание магнетизм. Точка света. Которое Точка нулевого магнетизма.`;
+
+const T9_PHRASES = [
+    "ЧИСТЫЙ ДУХ", "ВСЕ И НИЧТО", "ИСТИНА ПУСТОТА", "ЖИВО БЫТИЕ", "ГОЛОГРАММА",
+    "ПРИСУТСТВИЕ ВЕЧНОЕ", "СВЕТ ЗНАНИЯ", "КВАНТОВОЕ СОЗНАНИЕ", "ТОЧКА СВЕТА",
+    "БЛАГОДАРНОСТЬ", "ЛЮБЯЩАЯ ДОБРОТА", "НЕЖНО СВИДЕТЕЛЬ", "ЧИСТОЕ ОСОЗНАВАНИЕ",
+    "ПРОСТОРА БЕЗМОЛВИЕ", "ЕДИНОЕ КОСМИЧЕСКОЕ"
+];
+
+const sensory = [
+    "Почувствуй тепло в груди", "Звук тишины", "Вибрация в пальцах",
+    "Мурашки на коже", "Расслабь челюсть", "Ощути одежду на плечах",
+    "Почувствуй ладони", "Ощути влажность слизистых", "Заметь пульсацию",
+    "Правый глаз смотрит отдельно от левого", "Звук тишины главный проводник",
+    "Синхронизируй дыхание и сердцебиение", "Ничего не предпринимай",
+    "Тяни уши", "Шея медленно движется", "Пульсации во всём теле",
+    "Вибрации на кончиках пальцев", "Статическое электричество",
+    "Благодарность богатство", "Чувствуй", "Чувствовать вибрации",
+    "Аз есмь стопы", "Стань доступным для того, кто одно единое космическое сознание",
+    "Напитывай тела и оболочки плазмой", "Чувствуй тепло камина",
+    "Любящая доброта растёт и увеличивается с каждым вдохом и выдохом в миллион раз"
+];
+
+const wordWeightPhrases = [
+    "Чистый дух", "Всё и ничто", "Истина пустота", "И ничего", "Живо бытие",
+    "Ибо Свобода Простора", "Отсутствие я", "Осознание", "своей природы дома",
+    "Звука неделимого", "О Единое", "В центре Господь", "Простора",
+    "Север Юг", "Запад восток", "Присутствие", "Вечное", "Сил совершенное",
+    "Сей Ничто", "что возможно", "почувствовать", "И познать", "направить внимание", "описав",
+    "Чистое осознавание", "истиной природы", "тишина", "Безмолвие", "Простора",
+    "Эй Чем ты осознаёшь", "всё и ничто", "Осознавание", "осознания себя есть",
+    "Просто есть сердце", "Нежно Свидетель", "чувств настоящего", "Не рождённое ничего",
+    "Потенциал чистый дух", "Просто Ра", "Свет знания", "Квантовое сознание",
+    "Кто Абсолют", "Единое космическое", "Осознание", "магнетизм",
+    "Точка света", "Которое Точка", "нулевого магнетизма"
+];
+
+let letterMap = {};
+let prana = 0;
+let mode = 0, currentInput = "", targetVal = 0, phraseIdx = 0, charIdx = 0, isProcessing = false;
+let sensoryEnabled = false, reverseMode = false;
+let breathTimeout = null;
+let breathCount = 0;
+let meditationPhrases = [];
+
+let t9CurrentText = "", t9TargetPhrase = "", t9CurrentKey = null;
+let t9KeyPressCount = 0, t9Timeout = null, t9PhraseIndex = 0;
+
+const DOM = {};
+
+function init() {
+    cacheDOM();
+
+    for (let k in CONFIG) {
+        CONFIG[k].forEach((l, i) => {
+            letterMap[l] = { code: k, color: 'c'+k, shape: shapes[i % shapes.length] };
+        });
+    }
+
+    prana = parseFloat(localStorage.getItem('prana_v22')) || 0;
+    DOM.pranaVal.textContent = Math.floor(prana);
+
+    loadMeditationPhrases();
+    bindEvents();
+
+    // Создаём частицы в фоне, не блокируя первый рендер
+    const scheduleParticles = window.requestIdleCallback || (cb => setTimeout(cb, 200));
+    scheduleParticles(createParticles);
+}
+
+function cacheDOM() {
+    DOM.particles = document.getElementById('particles');
+    DOM.introModal = document.getElementById('intro-modal');
+    DOM.startBtn = document.getElementById('start-btn');
+    DOM.pranaVal = document.getElementById('prana-val');
+    DOM.statusLabel = document.getElementById('status-label');
+    DOM.btnVideo = document.getElementById('btn-video');
+    DOM.btnRef = document.getElementById('btn-ref');
+    DOM.navMenu = document.querySelector('.nav-menu');
+    DOM.btnHome = document.getElementById('btn-home');
+    DOM.viewport = document.getElementById('viewport');
+    DOM.flowerSvg = document.getElementById('flower-svg-container');
+    DOM.breathLabel = document.getElementById('breath-label');
+    DOM.reverseToggle = document.getElementById('reverse-toggle');
+    DOM.sensoryToggle = document.getElementById('sensory-toggle');
+    DOM.gameLayer = document.getElementById('game-layer');
+    DOM.gameDisplay = document.getElementById('game-display');
+    DOM.taskContent = document.getElementById('task-content');
+    DOM.inputBuffer = document.getElementById('input-buffer');
+    DOM.numpadZone = document.getElementById('numpad-zone');
+    DOM.keysContainer = document.getElementById('keys-container');
+    DOM.btnExitGame = document.getElementById('btn-exit-game');
+    DOM.videoContainer = document.getElementById('video-container');
+    DOM.vkVideo = document.getElementById('vk-video');
+    DOM.btnVideoClose = document.getElementById('btn-video-close');
+    DOM.refModal = document.getElementById('ref-modal');
+    DOM.refContent = document.getElementById('ref-content');
+    DOM.btnCloseRef = document.getElementById('btn-close-ref');
+    DOM.flashMsg = document.getElementById('flash-msg');
+    DOM.msgText = document.getElementById('msg-text');
+    DOM.loadTextBtn = document.getElementById('load-text-btn');
+    DOM.meditationTextModal = document.getElementById('meditation-text-modal');
+    DOM.meditationTextInput = document.getElementById('meditation-text-input');
+    DOM.btnSaveText = document.getElementById('btn-save-text');
+    DOM.btnResetText = document.getElementById('btn-reset-text');
+    DOM.btnCancelText = document.getElementById('btn-cancel-text');
+}
+
+function bindEvents() {
+    DOM.navMenu.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-mode]');
+        if (btn) startMode(parseInt(btn.dataset.mode));
+    });
+
+    DOM.btnHome.addEventListener('click', exitGame);
+    DOM.startBtn.addEventListener('click', startGame);
+    DOM.btnVideo.addEventListener('click', toggleVideo);
+    DOM.btnRef.addEventListener('click', toggleRef);
+    DOM.btnCloseRef.addEventListener('click', toggleRef);
+    DOM.btnVideoClose.addEventListener('click', toggleVideo);
+    DOM.btnExitGame.addEventListener('click', exitGame);
+    DOM.reverseToggle.addEventListener('click', toggleReverseMode);
+    DOM.sensoryToggle.addEventListener('click', toggleSensoryMode);
+    DOM.flashMsg.addEventListener('click', () => { DOM.flashMsg.style.display = 'none'; });
+    DOM.flowerSvg.addEventListener('click', () => addPrana(1));
+    DOM.loadTextBtn.addEventListener('click', showMeditationTextModal);
+    DOM.btnSaveText.addEventListener('click', saveMeditationText);
+    DOM.btnResetText.addEventListener('click', resetMeditationText);
+    DOM.btnCancelText.addEventListener('click', hideMeditationTextModal);
+}
+
+function createParticles() {
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < 15; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.left = Math.random() * 100 + '%';
+        particle.style.animationDelay = Math.random() * 10 + 's';
+        particle.style.animationDuration = (8 + Math.random() * 6) + 's';
+        fragment.appendChild(particle);
+    }
+    DOM.particles.appendChild(fragment);
+}
+
+function loadMeditationPhrases() {
+    const saved = localStorage.getItem('prana_meditation_phrases');
+    if (saved) {
+        meditationPhrases = JSON.parse(saved);
+    } else {
+        meditationPhrases = parseMeditationText(DEFAULT_MEDITATION_TEXT);
+        localStorage.setItem('prana_meditation_phrases', JSON.stringify(meditationPhrases));
+    }
+}
+
+function parseMeditationText(text) {
+    return text
+        .split(/[.!,?;]/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0)
+        .map(s => s.toUpperCase());
+}
+
+function showMeditationTextModal() {
+    DOM.meditationTextInput.value = meditationPhrases.join('. ') + '.';
+    DOM.meditationTextModal.style.display = 'flex';
+}
+
+function hideMeditationTextModal() {
+    DOM.meditationTextModal.style.display = 'none';
+}
+
+function saveMeditationText() {
+    const text = DOM.meditationTextInput.value.trim();
+    if (text) {
+        meditationPhrases = parseMeditationText(text);
+        localStorage.setItem('prana_meditation_phrases', JSON.stringify(meditationPhrases));
+        phraseIdx = 0;
+        hideMeditationTextModal();
+        renderGame();
+    }
+}
+
+function resetMeditationText() {
+    DOM.meditationTextInput.value = DEFAULT_MEDITATION_TEXT;
+}
+
+function startGame() {
+    DOM.introModal.style.display = 'none';
+}
+
+function addPrana(v) {
+    prana += v;
+    DOM.pranaVal.textContent = Math.floor(prana);
+    localStorage.setItem('prana_v22', prana);
+    if (Math.floor(prana) % 10 === 0 && v > 0) {
+        DOM.flowerSvg.classList.add('prana-glow');
+        setTimeout(() => DOM.flowerSvg.classList.remove('prana-glow'), 1500);
+    }
+}
+
+function toggleVideo() {
+    if (DOM.videoContainer.style.display === 'block') {
+        DOM.videoContainer.style.display = 'none';
+        DOM.vkVideo.src = "";
+    } else {
+        DOM.videoContainer.style.display = 'block';
+        DOM.vkVideo.src = "https://vk.com/video_ext.php?oid=-186690269&id=456239332&hash=f593881523457a41";
+    }
+}
+
+function startMode(m) {
+    mode = m;
+    currentInput = "";
+    charIdx = 0;
+
+    DOM.loadTextBtn.style.display = (mode === 1) ? 'block' : 'none';
+
+    if (mode === 4) phraseIdx = 0;
+    if (mode === 5) initT9();
+
+    document.querySelectorAll('.nav-menu button').forEach(btn => btn.classList.remove('active'));
+    if (m === 0) {
+        DOM.btnHome.classList.add('active');
+    } else {
+        const btn = document.querySelector(`.nav-menu button[data-mode="${m}"]`);
+        if (btn) btn.classList.add('active');
+    }
+
+    DOM.gameLayer.style.display = 'flex';
+    renderGame();
+}
+
+function exitGame() {
+    mode = 0;
+    if (t9Timeout) { clearTimeout(t9Timeout); t9Timeout = null; }
+    DOM.gameLayer.style.display = 'none';
+    document.querySelectorAll('.nav-menu button').forEach(btn => btn.classList.remove('active'));
+    DOM.btnHome.classList.add('active');
+}
+
+function renderGame() {
+    DOM.keysContainer.innerHTML = '';
+    DOM.inputBuffer.textContent = "";
+
+    if (mode === 1) renderMeditationMode();
+    else if (mode === 2) renderSymbolMode();
+    else if (mode === 3) renderArithmeticMode();
+    else if (mode === 4) renderWordWeightMode();
+    else if (mode === 5) renderT9();
+}
+
+function renderMeditationMode() {
+    const p = meditationPhrases[phraseIdx % meditationPhrases.length];
+    let h = '<div style="font-size:1.3rem; letter-spacing:3px;">';
+    let letterIndex = 0;
+    for (let i = 0; i < p.length; i++) {
+        const char = p[i];
+        const isSpace = char === ' ';
+        const color = isSpace ? 'transparent' : (letterIndex < charIdx ? 'var(--correct)' : 'rgba(255,236,139,0.25)');
+        const displayChar = isSpace ? '&nbsp;' : char;
+        h += `<span style="color:${color}; transition:color 0.3s; ${isSpace ? 'margin:0 8px;' : ''}">${displayChar}</span>`;
+        if (!isSpace) letterIndex++;
+    }
+    DOM.taskContent.innerHTML = `<div class="mode-desc">МЕДИТАЦИЯ: Вспомни код каждой буквы.</div>` + h + '</div>';
+    drawNumpad(true);
+}
+
+function renderSymbolMode() {
+    const letters = Object.keys(letterMap);
+    const target = letters[Math.floor(Math.random() * letters.length)];
+    DOM.taskContent.innerHTML = `<div class="mode-desc">СИМВОЛ: Угадай букву.</div>` + getShapeHTML(target, true, true);
+    DOM.taskContent.dataset.ans = target;
+    drawAlpha(target);
+}
+
+function renderArithmeticMode() {
+    const letters = Object.keys(letterMap);
+    const a = letters[Math.floor(Math.random() * letters.length)];
+    const b = letters[Math.floor(Math.random() * letters.length)];
+    targetVal = parseInt(letterMap[a].code) + parseInt(letterMap[b].code);
+    DOM.taskContent.innerHTML = `<div class="mode-desc">АРИФМЕТИКА: Выбери ответ.</div><div style="display:flex; align-items:center; justify-content:center; gap:15px;">${getShapeHTML(a)}<span style="font-size:1.5rem; color:var(--amber);">+</span>${getShapeHTML(b)}</div>`;
+    drawOptions();
+}
+
+function renderWordWeightMode() {
+    const w = wordWeightPhrases[phraseIdx].toUpperCase();
+    targetVal = 0;
+    for (let c of w) {
+        if (c !== ' ' && letterMap[c]) targetVal += parseInt(letterMap[c].code);
+    }
+    DOM.taskContent.innerHTML = `<div class="mode-desc">ВЕС СЛОВА: Сложи коды всех букв. (${phraseIdx + 1}/${wordWeightPhrases.length})</div><div style="font-size:1.5rem; letter-spacing:3px; color:var(--gold); text-shadow:0 0 20px var(--glow-gold); max-width:90%; line-height:1.4;">${w}</div>`;
+    drawNumpad(false);
+}
+
+function getShapeHTML(l, isB, sC) {
+    const d = letterMap[l];
+    const size = isB ? 'width:80px;height:80px;font-size:2rem;' : 'width:55px;height:55px;';
+    return `<div class="shape ${d.shape} ${d.color}" style="${size}box-shadow:0 4px 20px rgba(0,0,0,0.3);"><span style="text-shadow:0 1px 3px rgba(0,0,0,0.3);">${sC?d.code:l}</span></div>`;
+}
+
+function drawNumpad(auto) {
+    DOM.keysContainer.className = 'grid-num';
+    const fragment = document.createDocumentFragment();
+
+    for (let i = 1; i <= 9; i++) {
+        fragment.appendChild(createKey(i, () => handleNumpadInput(i, auto)));
+    }
+    fragment.appendChild(createKey('C', () => {
+        currentInput = "";
+        DOM.inputBuffer.textContent = "";
+    }));
+    fragment.appendChild(createKey('0', () => handleNumpadInput(0, auto)));
+    if (!auto) fragment.appendChild(createKey('OK', check));
+
+    DOM.keysContainer.appendChild(fragment);
+}
+
+function handleNumpadInput(num, auto) {
+    if (isProcessing) return;
+    if (auto) {
+        currentInput = num;
+        check();
+    } else {
+        currentInput += num;
+        DOM.inputBuffer.textContent = currentInput;
+    }
+}
+
+function createKey(text, onClick) {
+    const btn = document.createElement('button');
+    btn.className = 'k';
+    btn.textContent = text;
+    btn.addEventListener('click', onClick);
+    return btn;
+}
+
+function drawOptions() {
+    DOM.keysContainer.className = 'grid-options';
+    const opts = new Set([targetVal]);
+    while (opts.size < 4) {
+        const r = targetVal + Math.floor(Math.random() * 7) - 3;
+        if (r > 0) opts.add(r);
+    }
+    const fragment = document.createDocumentFragment();
+    Array.from(opts).sort(() => Math.random() - 0.5).forEach(o => {
+        fragment.appendChild(createKey(o, () => { currentInput = o; check(); }));
+    });
+    DOM.keysContainer.appendChild(fragment);
+}
+
+function drawAlpha(target) {
+    DOM.keysContainer.className = 'grid-alpha';
+    const fragment = document.createDocumentFragment();
+    const letters = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ";
+
+    for (let l of letters) {
+        const btn = document.createElement('button');
+        btn.className = 'k';
+        btn.textContent = l;
+        btn.style.fontSize = '13px';
+        btn.style.padding = '12px 0';
+        btn.addEventListener('click', () => {
+            if (isProcessing) return;
+            if (l === target) { addPrana(30); renderGame(); }
+        });
+        fragment.appendChild(btn);
+    }
+    DOM.keysContainer.appendChild(fragment);
+}
+
+function check() {
+    if (isProcessing) return;
+    if (mode === 1) checkMeditation();
+    else if (mode === 4) checkWordWeight();
+    else checkStandard();
+}
+
+function checkMeditation() {
+    const p = meditationPhrases[phraseIdx % meditationPhrases.length];
+    let currentLetterIdx = 0;
+    let targetChar = '';
+
+    for (let i = 0; i < p.length; i++) {
+        if (p[i] !== ' ') {
+            if (currentLetterIdx === charIdx) { targetChar = p[i]; break; }
+            currentLetterIdx++;
+        }
+    }
+
+    if (targetChar && letterMap[targetChar] && letterMap[targetChar].code == currentInput) {
+        charIdx++;
+        addPrana(15);
+        const totalLetters = [...p].filter(c => c !== ' ').length;
+        if (charIdx >= totalLetters) {
+            charIdx = 0;
+            phraseIdx = (phraseIdx + 1) % meditationPhrases.length;
+            addPrana(50);
+        }
+    } else {
+        charIdx = 0;
+    }
+    currentInput = "";
+    renderGame();
+}
+
+function checkWordWeight() {
+    isProcessing = true;
+    const isCorrect = parseInt(currentInput) === targetVal;
+    if (isCorrect) {
+        DOM.inputBuffer.textContent = "✨ ВЕРНО";
+        DOM.inputBuffer.style.color = "var(--correct)";
+        addPrana(40);
+        phraseIdx++;
+        if (phraseIdx >= wordWeightPhrases.length) phraseIdx = 0;
+        setTimeout(() => { currentInput = ""; renderGame(); isProcessing = false; }, 700);
+    } else {
+        DOM.inputBuffer.textContent = "❌";
+        DOM.inputBuffer.style.color = "#ff6b6b";
+        setTimeout(() => { currentInput = ""; DOM.inputBuffer.textContent = ""; isProcessing = false; }, 600);
+    }
+}
+
+function checkStandard() {
+    isProcessing = true;
+    const isCorrect = parseInt(currentInput) === targetVal;
+    if (isCorrect) {
+        DOM.inputBuffer.textContent = "✨ ВЕРНО";
+        DOM.inputBuffer.style.color = "var(--correct)";
+        addPrana(40);
+        setTimeout(() => { currentInput = ""; renderGame(); isProcessing = false; }, 700);
+    } else {
+        DOM.inputBuffer.textContent = "❌";
+        DOM.inputBuffer.style.color = "#ff6b6b";
+        setTimeout(() => { currentInput = ""; DOM.inputBuffer.textContent = ""; isProcessing = false; }, 600);
+    }
+}
+
+function toggleRef() {
+    const isVisible = DOM.refModal.style.display === 'block';
+    DOM.refModal.style.display = isVisible ? 'none' : 'block';
+
+    if (!isVisible) {
+        const fragment = document.createDocumentFragment();
+        for (let l in letterMap) {
+            const d = letterMap[l];
+            const item = document.createElement('div');
+            item.className = 'ref-item';
+            item.innerHTML = `
+                <div style="font-size:1.2rem; color:var(--gold); margin-bottom:5px;">${l}</div>
+                <div class="shape ${d.shape} ${d.color}" style="width:35px;height:35px;margin:8px auto;font-size:12px;">
+                    <span>${d.code}</span>
+                </div>
+            `;
+            fragment.appendChild(item);
+        }
+        DOM.refContent.innerHTML = '';
+        DOM.refContent.appendChild(fragment);
+    }
+}
+
+function toggleReverseMode() {
+    reverseMode = !reverseMode;
+
+    if (reverseMode) {
+        DOM.reverseToggle.classList.add('active');
+        DOM.reverseToggle.innerHTML = `
+            <span class="main-text">РЕВЕРСИЯ</span>
+            <span class="hint">Физ. выдох = мысл. вдох | Физ. вдох = мысл. выдох</span>
+        `;
+        DOM.breathLabel.textContent = "ВДОХ";
+        DOM.breathLabel.classList.add('visible');
+        DOM.statusLabel.style.opacity = '0';
+        DOM.flowerSvg.style.animation = 'none';
+        requestAnimationFrame(startReverseBreathing);
+    } else {
+        DOM.reverseToggle.classList.remove('active');
+        DOM.reverseToggle.innerHTML = `
+            <span class="main-text">РЕВЕРСИЯ</span>
+            <span class="hint">Во время физического выдоха — мысленный вдох</span>
+        `;
+        DOM.breathLabel.classList.remove('visible');
+        DOM.statusLabel.style.opacity = '1';
+        stopReverseBreathing();
+        DOM.flowerSvg.style.animation = 'flower-breathe 8s ease-in-out infinite';
+    }
+}
+
+function startReverseBreathing() {
+    if (!reverseMode) return;
+
+    const tIn = parseFloat(document.getElementById('t-in').value) || 4;
+    const tOut = parseFloat(document.getElementById('t-out').value) || 4;
+    let isContracting = true;
+
+    function breathe() {
+        if (!reverseMode) return;
+
+        if (isContracting) {
+            DOM.breathLabel.style.opacity = '1';
+            DOM.flowerSvg.style.transition = `transform ${tOut}s cubic-bezier(0.4, 0, 0.2, 1)`;
+            DOM.flowerSvg.style.transform = "scale(1.1)";
+        } else {
+            DOM.breathLabel.style.opacity = '1';
+            DOM.flowerSvg.style.transition = `transform ${tIn}s cubic-bezier(0.4, 0, 0.2, 1)`;
+            DOM.flowerSvg.style.transform = "scale(0.9)";
+        }
+
+        if (!isContracting) {
+            breathCount++;
+            if (sensoryEnabled && breathCount % 5 === 0) triggerSensory();
+        }
+
+        isContracting = !isContracting;
+        breathTimeout = setTimeout(breathe, (isContracting ? tIn : tOut) * 1000);
+    }
+
+    breathe();
+}
+
+function stopReverseBreathing() {
+    if (breathTimeout) { clearTimeout(breathTimeout); breathTimeout = null; }
+}
+
+function toggleSensoryMode() {
+    sensoryEnabled = !sensoryEnabled;
+    DOM.sensoryToggle.classList.toggle('active', sensoryEnabled);
+    if (sensoryEnabled) breathCount = 0;
+}
+
+function triggerSensory() {
+    DOM.msgText.textContent = sensory[Math.floor(Math.random() * sensory.length)];
+    DOM.flashMsg.style.display = 'flex';
+}
+
+function initT9() {
+    t9CurrentText = "";
+    t9CurrentKey = null;
+    t9KeyPressCount = 0;
+    t9PhraseIndex = 0;
+    t9TargetPhrase = T9_PHRASES[0];
+    if (t9Timeout) { clearTimeout(t9Timeout); t9Timeout = null; }
+}
+
+function renderT9() {
+    let html = `
+        <div class="mode-desc">Т9: Набери фразу мульти-тапом. Нажимай цифру несколько раз для выбора буквы.</div>
+        <div class="t9-target">Цель: ${t9TargetPhrase}</div>
+        <div class="t9-display" id="t9-display">
+            <span id="t9-text">${t9CurrentText}</span><span class="cursor">|</span>
+        </div>
+        <div class="t9-progress">Фраза ${t9PhraseIndex + 1} из ${T9_PHRASES.length}</div>
+    `;
+    DOM.taskContent.innerHTML = html;
+    DOM.inputBuffer.style.display = 'none';
+
+    DOM.keysContainer.className = 't9-keyboard';
+    const fragment = document.createDocumentFragment();
+
+    for (let i = 1; i <= 9; i++) {
+        const keyData = T9_CONFIG[i];
+        const keyEl = document.createElement('div');
+        keyEl.className = 't9-key';
+        keyEl.dataset.key = i;
+        keyEl.innerHTML = `<div class="number">${i}</div><div class="letters">${keyData.label}</div>`;
+        keyEl.addEventListener('click', () => handleT9KeyPress(i));
+        fragment.appendChild(keyEl);
+    }
+
+    const key0 = document.createElement('div');
+    key0.className = 't9-key';
+    key0.dataset.key = 0;
+    key0.innerHTML = `<div class="number">0</div><div class="letters">ПРОБЕЛ</div>`;
+    key0.addEventListener('click', () => handleT9KeyPress(0));
+    fragment.appendChild(key0);
+
+    const keyC = document.createElement('div');
+    keyC.className = 't9-key';
+    keyC.style.cssText = 'background:rgba(255,107,157,0.1);border-color:rgba(255,107,157,0.3);';
+    keyC.innerHTML = `<div class="number" style="color:var(--rose)">⌫</div><div class="letters" style="color:var(--rose)">СТЕРЕТЬ</div>`;
+    keyC.addEventListener('click', handleT9Backspace);
+    fragment.appendChild(keyC);
+
+    const keyOK = document.createElement('div');
+    keyOK.className = 't9-key';
+    keyOK.style.cssText = 'background:rgba(0,212,170,0.1);border-color:rgba(0,212,170,0.3);';
+    keyOK.innerHTML = `<div class="number" style="color:var(--cyan)">✓</div><div class="letters" style="color:var(--cyan)">ГОТОВО</div>`;
+    keyOK.addEventListener('click', checkT9Input);
+    fragment.appendChild(keyOK);
+
+    DOM.keysContainer.appendChild(fragment);
+}
+
+function handleT9KeyPress(keyNum) {
+    if (keyNum === 0) {
+        confirmT9Letter();
+        t9CurrentText += ' ';
+        updateT9Display();
+        return;
+    }
+
+    const keyData = T9_CONFIG[keyNum];
+
+    if (t9CurrentKey === keyNum) {
+        t9KeyPressCount = (t9KeyPressCount + 1) % keyData.letters.length;
+    } else {
+        confirmT9Letter();
+        t9CurrentKey = keyNum;
+        t9KeyPressCount = 0;
+    }
+
+    const currentLetter = keyData.letters[t9KeyPressCount];
+    showT9CurrentLetter(keyNum, currentLetter);
+    showT9ShapePreview(currentLetter);
+
+    if (t9Timeout) clearTimeout(t9Timeout);
+    t9Timeout = setTimeout(() => confirmT9Letter(), 1000);
+
+    updateT9Display(currentLetter);
+}
+
+function showT9ShapePreview(letter) {
+    if (!letterMap[letter]) return;
+
+    const preview = document.createElement('div');
+    preview.className = 't9-shape-preview';
+    preview.innerHTML = getShapeHTML(letter, true, false);
+    document.body.appendChild(preview);
+
+    setTimeout(() => {
+        preview.classList.add('fade-out');
+        setTimeout(() => preview.remove(), 300);
+    }, 1000);
+}
+
+function showT9CurrentLetter(keyNum, letter) {
+    document.querySelectorAll('.t9-key .current-letter').forEach(el => el.remove());
+    document.querySelectorAll('.t9-key').forEach(el => el.classList.remove('active'));
+
+    const keyEl = document.querySelector(`.t9-key[data-key="${keyNum}"]`);
+    if (keyEl) {
+        keyEl.classList.add('active');
+        const indicator = document.createElement('div');
+        indicator.className = 'current-letter';
+        indicator.textContent = letter;
+        keyEl.appendChild(indicator);
+    }
+}
+
+function confirmT9Letter() {
+    if (t9CurrentKey !== null && t9Timeout) {
+        const keyData = T9_CONFIG[t9CurrentKey];
+        const letter = keyData.letters[t9KeyPressCount];
+        t9CurrentText += letter;
+        t9CurrentKey = null;
+        t9KeyPressCount = 0;
+        clearTimeout(t9Timeout);
+        t9Timeout = null;
+
+        document.querySelectorAll('.t9-key .current-letter').forEach(el => el.remove());
+        document.querySelectorAll('.t9-key').forEach(el => el.classList.remove('active'));
+
+        updateT9Display();
+    }
+}
+
+function handleT9Backspace() {
+    if (t9CurrentKey !== null) confirmT9Letter();
+    if (t9CurrentText.length > 0) {
+        t9CurrentText = t9CurrentText.slice(0, -1);
+        updateT9Display();
+    }
+}
+
+function updateT9Display(previewLetter = null) {
+    const display = document.getElementById('t9-text');
+    if (display) display.textContent = t9CurrentText + (previewLetter || '');
+}
+
+function checkT9Input() {
+    confirmT9Letter();
+
+    const input = t9CurrentText.trim();
+
+    if (input === t9TargetPhrase) {
+        addPrana(50);
+        DOM.inputBuffer.style.display = 'block';
+        DOM.inputBuffer.textContent = "✨ ОТЛИЧНО!";
+        DOM.inputBuffer.style.color = "var(--correct)";
+
+        t9PhraseIndex++;
+        if (t9PhraseIndex >= T9_PHRASES.length) { t9PhraseIndex = 0; addPrana(100); }
+
+        setTimeout(() => {
+            t9CurrentText = "";
+            t9TargetPhrase = T9_PHRASES[t9PhraseIndex];
+            DOM.inputBuffer.style.display = 'none';
+            renderT9();
+        }, 800);
+    } else {
+        DOM.inputBuffer.style.display = 'block';
+        DOM.inputBuffer.textContent = "Продолжай набирать...";
+        DOM.inputBuffer.style.color = "var(--amber)";
+        setTimeout(() => { DOM.inputBuffer.style.display = 'none'; }, 1200);
+    }
+}
+
+init();
+</script>
+</body>
+</html>
