@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>НейроАквариум</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#060c18; overflow:hidden; touch-action:none; font-family:monospace; }
+canvas { display:block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+'use strict';
+const { Engine, Bodies, Body, World, Events } = Matter;
+
+// ==================== ДАННЫЕ ====================
+const GROUPS = {
+  1:['И','С','Э'],     2:['А','Й','П','Т'],
+  3:['Б','З','М','Ю'], 4:['В','К','Ф','Я'],
+  5:['Д','Л','Х','Ы'], 6:['Е','О','Ц','Ь'],
+  7:['Ё','Н','Ъ'],     8:['Г','У','Ч','Щ'],
+  9:['Ж','Р','Ш']
+};
+const CLR = {
+  1:'#ff5f5f', 2:'#ffd700', 3:'#2ecc71',
+  4:'#1ab8b8', 5:'#4d88ff', 6:'#7dce82',
+  7:'#aaaaaa', 8:'#ff4d8f', 9:'#9b59b6'
+};
+const SHAPES = ['circle','roundRect','triangle','diamond'];
+const RADII  = { 1:13, 2:17, 3:21, 4:26, 5:32, 6:39, 7:47, 8:56, 9:66 };
+
+// Таблица позиций и обратный поиск
+const AT = {}, INFO = {};
+for (const [c, arr] of Object.entries(GROUPS)) {
+  arr.forEach((l, i) => {
+    AT[`${c}_${i}`] = l;
+    INFO[l] = { code: +c, si: i, color: CLR[c] };
+  });
+}
+
+// Правило слияния:
+//   условие:  sameCode(код₁=код₂) ИЛИ sameSi(форма₁=форма₂)
+//   результат: код=код₁+код₂, si=(si₁+si₂)%4
+//   блокировка: если (код,si) нет в таблице (позиции 1◇,7◇,9◇)
+
+const DROP_POOL = [
+  { code:1, si:0 }, // И ○
+  { code:1, si:1 }, // С □
+  { code:1, si:2 }, // Э △
+];
+function pickDrop() {
+  const t = DROP_POOL[Math.floor(Math.random() * DROP_POOL.length)];
+  return { ...t, letter: AT[`${t.code}_${t.si}`], color: CLR[t.code], r: RADII[t.code] };
+}
+
+// ==================== CANVAS ====================
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+let W, H, DPR;
+
+// roundRect polyfill
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r) {
+    const R = typeof r === 'number' ? r : (r[0]||0);
+    this.moveTo(x+R,y); this.lineTo(x+w-R,y); this.arcTo(x+w,y,x+w,y+R,R);
+    this.lineTo(x+w,y+h-R); this.arcTo(x+w,y+h,x+w-R,y+h,R);
+    this.lineTo(x+R,y+h); this.arcTo(x,y+h,x,y+h-R,R);
+    this.lineTo(x,y+R); this.arcTo(x,y,x+R,y,R);
+  };
+}
+
+function resizeCanvas() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width  = W * DPR; canvas.height = H * DPR;
+  canvas.style.width  = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+resizeCanvas();
+
+// ==================== LAYOUT ====================
+let AQ = {};
+function layoutAQ() {
+  const hdrH = 65, dropH = 72;
+  const maxW = Math.min(W * .9, 340);
+  const maxH = H - hdrH - dropH - 14;
+  const w = Math.min(maxW, maxH * .58);
+  const h = Math.min(maxH, w / .58);
+  AQ = { x:(W-w)/2, y:hdrH+dropH, w, h, dropY:hdrH+dropH*.5 };
+}
+layoutAQ();
+
+// ==================== PHYSICS ====================
+const engine = Engine.create({ gravity: { y: 2.2 } });
+const world  = engine.world;
+let walls = [];
+let figs  = new Map(); // body.id → fig object
+
+function buildWalls() {
+  World.remove(world, walls); walls = [];
+  const T = 32, { x, y, w, h } = AQ;
+  const opt = { isStatic:true, friction:.55, restitution:.05, label:'wall' };
+  walls = [
+    Bodies.rectangle(x+w/2,  y+h+T/2,  w+T*2, T,    opt), // дно
+    Bodies.rectangle(x-T/2,  y+h/2,    T, h+T*2,    opt), // левая
+    Bodies.rectangle(x+w+T/2,y+h/2,    T, h+T*2,    opt), // правая
+  ];
+  World.add(world, walls);
+}
+
+function addFig(x, y, code, si) {
+  const letter = AT[`${code}_${si}`];
+  if (!letter) return null;
+  const r = RADII[code];
+  const body = Bodies.circle(x, y, r, {
+    restitution:.22, friction:.48, frictionAir:.018,
+    density:.002, label:'fig'
+  });
+  const fig = { body, code, si, r, letter, color:CLR[code],
+    merging:false, spawnT:Date.now(), overT:null, pop:0 };
+  figs.set(body.id, fig);
+  World.add(world, body);
+  return fig;
+}
+
+// ==================== СЛИЯНИЯ ====================
+Events.on(engine, 'collisionStart', ev => {
+  for (const { bodyA, bodyB } of ev.pairs) {
+    const fa = figs.get(bodyA.id), fb = figs.get(bodyB.id);
+    if (!fa || !fb || fa.merging || fb.merging) continue;
+
+    const now = Date.now();
+    if (now - fa.spawnT < 260 || now - fb.spawnT < 260) continue;
+
+    const sameCode = fa.code === fb.code;
+    const sameSi   = fa.si   === fb.si;
+    if (!sameCode && !sameSi) continue; // нет общих признаков → нет слияния
+
+    const nc = fa.code + fb.code;
+    if (nc > 9) continue;            // код > 9 → нет в таблице
+    const ns = (fa.si + fb.si) % 4;
+    if (!AT[`${nc}_${ns}`]) continue; // заблокированная позиция (1◇,7◇,9◇)
+
+    fa.merging = fb.merging = true;
+    fa.pop = fb.pop = 1.4;
+    Body.setStatic(bodyA, true);
+    Body.setStatic(bodyB, true);
+
+    const mx = (bodyA.position.x + bodyB.position.x) * .5;
+    const my = (bodyA.position.y + bodyB.position.y) * .5;
+    setTimeout(() => doMerge(fa, fb, nc, ns, mx, my), 220);
+  }
+});
+
+function doMerge(fa, fb, nc, ns, mx, my) {
+  if (!figs.has(fa.body.id) || !figs.has(fb.body.id)) return;
+  World.remove(world, fa.body); figs.delete(fa.body.id);
+  World.remove(world, fb.body); figs.delete(fb.body.id);
+
+  const ny = Math.min(my, AQ.y + AQ.h - RADII[nc] - 2);
+  const nf = addFig(mx, ny, nc, ns);
+  if (nf) {
+    nf.pop = 1.7;
+    score += nc * 10;
+    if (score > hi) { hi = score; localStorage.setItem('aq_hi', hi); }
+    burst(mx, my, CLR[nc], 14);
+    showMergeLabel(mx, my, nf.letter, CLR[nc]);
+  }
+}
+
+// ==================== СОСТОЯНИЕ ====================
+let screen = 'menu', prevScreen = 'menu';
+let score = 0, hi = +localStorage.getItem('aq_hi') || 0;
+let canDrop = true, cur = null, nxt = null, aimX = 0;
+let particles = [], mergeLabels = [];
+let menuT = 0, goTick = 0;
+let HB = { x:0, y:0, w:0, h:0 }; // help button bounds (updated in drawHUD)
+
+function startGame() {
+  figs.forEach(f => World.remove(world, f.body));
+  figs.clear();
+  score = 0; canDrop = true; particles = []; mergeLabels = [];
+  cur = pickDrop(); nxt = pickDrop();
+  aimX = AQ.x + AQ.w / 2;
+  screen = 'game';
+}
+
+function doDrop() {
+  if (!canDrop || screen !== 'game' || !cur) return;
+  const { x, w } = AQ, r = cur.r;
+  const cx = Math.max(x + r + 1, Math.min(x + w - r - 1, aimX));
+  addFig(cx, AQ.dropY - r, cur.code, cur.si);
+  canDrop = false; cur = nxt; nxt = pickDrop();
+  setTimeout(() => { canDrop = true; }, 530);
+}
+
+function checkGO() {
+  if (screen !== 'game') return;
+  const limit = AQ.y + 10;
+  for (const [, f] of figs) {
+    if (f.merging || Date.now() - f.spawnT < 1500) continue;
+    const sp = Math.hypot(f.body.velocity.x, f.body.velocity.y);
+    if (f.body.position.y - f.r < limit && sp < .6) {
+      if (!f.overT) f.overT = Date.now();
+      else if (Date.now() - f.overT > 4500) { screen = 'gameover'; canDrop = false; return; }
+    } else { f.overT = null; }
+  }
+}
+
+// ==================== ЧАСТИЦЫ ====================
+function burst(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.PI * 2 * i / n + Math.random() * .5;
+    const sp = 2.5 + Math.random() * 4;
+    particles.push({ x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:38+Math.random()*20, color });
+  }
+}
+
+function showMergeLabel(x, y, letter, color) {
+  mergeLabels.push({ x, y, letter, color, vy:-1.8, life:55 });
+}
+
+// ==================== РИСОВАНИЕ ФИГУР ====================
+function drawFig(x, y, r, si, color, letter, pop, code) {
+  const sc = pop > 1 ? 1 + (pop - 1) * .28 : 1;
+  ctx.save();
+  ctx.translate(x, y); if (sc !== 1) ctx.scale(sc, sc);
+
+  // Тёмный фон-круг
+  ctx.shadowColor = color; ctx.shadowBlur = 15;
+  ctx.fillStyle = 'rgba(5,10,24,.72)';
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+
+  // Фигура (заливка)
+  ctx.fillStyle = color + 'b0'; ctx.shadowBlur = 10;
+  ctx.beginPath(); shapePath(0, 0, r, si); ctx.closePath(); ctx.fill();
+
+  // Фигура (контур)
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.shadowBlur = 8;
+  ctx.beginPath(); shapePath(0, 0, r, si); ctx.closePath(); ctx.stroke();
+
+  ctx.shadowBlur = 0;
+
+  // Буква — чуть выше центра если есть место для числа
+  const hasRoom = r >= 18;
+  const letterY = hasRoom ? -r * .14 : 0;
+  ctx.shadowColor = color; ctx.shadowBlur = 8;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${Math.max(r * (hasRoom ? .6 : .72), 9)}px monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(letter, 0, letterY);
+
+  // Число кода — под буквой, маленькое, цветное
+  if (code && hasRoom) {
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = color;
+    ctx.font = `bold ${Math.max(r * .38, 7)}px monospace`;
+    ctx.fillText(String(code), 0, r * .42);
+  }
+
+  ctx.restore();
+}
+
+function shapePath(x, y, r, si) {
+  if (si === 0) {
+    ctx.arc(x, y, r * .85, 0, Math.PI * 2);
+  } else if (si === 1) {
+    const s = r * .73, cr = s * .38;
+    ctx.roundRect(x - s, y - s, s * 2, s * 2, cr);
+  } else if (si === 2) {
+    ctx.moveTo(x,       y - r * .88);
+    ctx.lineTo(x + r * .78, y + r * .54);
+    ctx.lineTo(x - r * .78, y + r * .54);
+  } else {
+    ctx.moveTo(x,       y - r * .9);
+    ctx.lineTo(x + r * .6, y);
+    ctx.lineTo(x,       y + r * .9);
+    ctx.lineTo(x - r * .6, y);
+  }
+}
+
+// ==================== РИСОВАНИЕ АКВАРИУМА ====================
+function drawAQ() {
+  const { x, y, w, h } = AQ;
+  ctx.save();
+
+  // Вода
+  const wg = ctx.createLinearGradient(x, y, x, y + h);
+  wg.addColorStop(0, 'rgba(0,14,38,.94)');
+  wg.addColorStop(1, 'rgba(0,28,68,.97)');
+  ctx.fillStyle = wg;
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, [0, 0, 10, 10]); ctx.fill();
+
+  // Линия опасности
+  ctx.strokeStyle = 'rgba(255,50,50,.3)'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 5]);
+  ctx.beginPath(); ctx.moveTo(x, y + 26); ctx.lineTo(x + w, y + 26); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Стенки (свечение)
+  ctx.shadowColor = '#00b4e8'; ctx.shadowBlur = 10;
+  ctx.strokeStyle = 'rgba(0,180,232,.45)'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(x, y); ctx.lineTo(x, y + h);
+  ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y);
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  // Блик дна
+  const bg = ctx.createLinearGradient(x, y + h - 28, x, y + h);
+  bg.addColorStop(0, 'rgba(0,180,232,0)');
+  bg.addColorStop(1, 'rgba(0,180,232,.18)');
+  ctx.fillStyle = bg; ctx.fillRect(x, y + h - 28, w, 28);
+  ctx.restore();
+}
+
+// Пузыри
+const bubbles = Array.from({ length: 22 }, (_, i) => ({
+  x: Math.random() * 320, y: Math.random() * 700 + 100,
+  vy: .25 + Math.random() * .4,
+  r: 1.5 + Math.random() * 2.5,
+  a: .08 + Math.random() * .14,
+  ph: Math.random() * Math.PI * 2
+}));
+let btick = 0;
+function drawBubbles() {
+  const { x, y, w, h } = AQ;
+  ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  btick++;
+  for (const b of bubbles) {
+    b.y -= b.vy;
+    if (b.y < y - 5) b.y = y + h + 10;
+    const bx = x + (b.x % (w - 6)) + 3;
+    const bxw = bx + Math.sin(btick * .016 + b.ph) * 2.5;
+    ctx.globalAlpha = b.a;
+    ctx.strokeStyle = 'rgba(80,200,255,.8)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(bxw, b.y, b.r, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ==================== DROP ZONE ====================
+function drawDrop() {
+  if (!canDrop || !cur) return;
+  const { x, w, dropY } = AQ, r = cur.r;
+  const cx = Math.max(x + r + 1, Math.min(x + w - r - 1, aimX));
+
+  // Прицельная линия
+  ctx.strokeStyle = cur.color + '30'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(cx, dropY + r); ctx.lineTo(cx, AQ.y + AQ.h); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Тень падения
+  const grad = ctx.createLinearGradient(cx, dropY + r, cx, AQ.y + AQ.h);
+  grad.addColorStop(0, cur.color + '18');
+  grad.addColorStop(1, cur.color + '00');
+  ctx.strokeStyle = grad; ctx.lineWidth = r * 1.8;
+  ctx.beginPath(); ctx.moveTo(cx, dropY + r); ctx.lineTo(cx, AQ.y + AQ.h); ctx.stroke();
+
+  // Превью фигуры
+  ctx.save(); ctx.globalAlpha = .52;
+  drawFig(cx, dropY, r, cur.si, cur.color, cur.letter, 0, cur.code);
+  ctx.restore();
+}
+
+// ==================== HUD ====================
+function drawHUD() {
+  ctx.fillStyle = 'rgba(6,12,24,.97)'; ctx.fillRect(0, 0, W, 65);
+  const ts = Math.min(W * .048, 19);
+  ctx.textBaseline = 'middle';
+
+  ctx.fillStyle = '#ffd700'; ctx.font = `bold ${ts}px monospace`;
+  ctx.textAlign = 'left'; ctx.fillText(`★ ${score}`, 12, 32);
+
+  // Кнопка ТАБЛ.
+  HB.w = Math.min(W * .13, 52); HB.h = 26;
+  HB.x = 12 + ctx.measureText(`★ ${score}`).width + 10;
+  HB.y = (65 - HB.h) / 2;
+  ctx.beginPath(); ctx.roundRect(HB.x, HB.y, HB.w, HB.h, 5);
+  ctx.fillStyle = 'rgba(0,180,232,.18)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(0,180,232,.52)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = '#88eeff'; ctx.font = `bold ${Math.min(HB.h * .44, 12)}px monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('ТАБЛ.', HB.x + HB.w / 2, 32);
+
+  ctx.fillStyle = 'rgba(255,215,0,.35)'; ctx.font = `${ts * .65}px monospace`;
+  ctx.textAlign = 'center'; ctx.fillText(`рекорд: ${hi}`, W / 2 + 15, 32);
+
+  if (nxt) {
+    const nr = RADII[nxt.code];
+    ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.font = `${ts * .58}px monospace`;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText('след.', W - 12, 8);
+    ctx.textBaseline = 'middle';
+    ctx.save(); ctx.globalAlpha = .78;
+    drawFig(W - 14 - nr, 40, nr, nxt.si, nxt.color, nxt.letter, 0, nxt.code);
+    ctx.restore();
+  }
+  ctx.textBaseline = 'alphabetic';
+}
+
+// ==================== ТАБЛИЦА КОДОВ ====================
+function drawHelp() {
+  ctx.fillStyle = '#060c18'; ctx.fillRect(0, 0, W, H);
+
+  const padX = 10, topH = 52, botH = 54;
+  const codeColW = 36;
+  const cellW = (W - padX * 2 - codeColW) / 4;
+  const rowH = Math.min((H - topH - botH - 8) / 10, 58);
+  const startY = topH + 4;
+  const SYM = ['○','□','△','◇'];
+
+  // Шапка
+  ctx.fillStyle = 'rgba(0,14,38,.97)'; ctx.fillRect(0, 0, W, topH);
+  ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(topH * .44, 18)}px monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('ТАБЛИЦА КОДОВ', W / 2, topH / 2);
+
+  // Заголовки столбцов (формы)
+  for (let c = 0; c < 4; c++) {
+    const cx = padX + codeColW + c * cellW + cellW / 2;
+    ctx.fillStyle = '#555'; ctx.font = `bold ${Math.min(rowH * .52, 22)}px monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(SYM[c], cx, startY + rowH / 2);
+  }
+
+  // 9 строк кодов
+  for (let code = 1; code <= 9; code++) {
+    const color = CLR[code];
+    const letters = GROUPS[code];
+    const ry = startY + code * rowH;
+
+    // Фон строки
+    ctx.fillStyle = code % 2 === 0 ? `${color}0d` : `${color}06`;
+    ctx.fillRect(padX, ry, W - padX * 2, rowH - 1);
+
+    // Кружок с кодом (левый столбец)
+    const cR = Math.min(rowH * .3, 14), cX = padX + codeColW / 2, cY = ry + rowH / 2;
+    ctx.shadowColor = color; ctx.shadowBlur = 8;
+    ctx.fillStyle = color + '30';
+    ctx.beginPath(); ctx.arc(cX, cY, cR, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.min(cR * 1.3, 13)}px monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(code), cX, cY);
+
+    // Ячейки букв (4 формы)
+    for (let si = 0; si < 4; si++) {
+      const letter = letters[si];
+      const cx = padX + codeColW + si * cellW + cellW / 2;
+      const cy = ry + rowH / 2;
+
+      if (!letter) {
+        ctx.fillStyle = 'rgba(255,255,255,.1)';
+        ctx.font = `${Math.min(rowH * .38, 15)}px monospace`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('—', cx, cy);
+        continue;
+      }
+
+      const fR = Math.min(rowH * .3, 13);
+      ctx.save();
+      ctx.shadowColor = color; ctx.shadowBlur = 5;
+      ctx.fillStyle = color + '22';
+      ctx.beginPath(); shapePath(cx, cy, fR, si); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = color + '66'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); shapePath(cx, cy, fR, si); ctx.closePath(); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = color;
+      ctx.font = `bold ${Math.min(rowH * .46, 20)}px monospace`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(letter, cx, cy);
+      ctx.restore();
+    }
+
+    // Разделитель строки
+    ctx.strokeStyle = 'rgba(255,255,255,.05)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padX, ry + rowH - .5); ctx.lineTo(W - padX, ry + rowH - .5); ctx.stroke();
+  }
+
+  // Кнопка ЗАКРЫТЬ
+  const bH = Math.min(H * .06, 40), bW = Math.min(W * .5, 160);
+  const bX = W / 2 - bW / 2, bY = H - bH - 8;
+  ctx.beginPath(); ctx.roundRect(bX, bY, bW, bH, bH / 2);
+  ctx.fillStyle = 'rgba(255,215,0,.14)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,215,0,.45)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(bH * .44, 15)}px monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('ЗАКРЫТЬ', W / 2, bY + bH / 2);
+  ctx.textBaseline = 'alphabetic';
+}
+
+// ==================== МЕНЮ ====================
+const menuOrbs = Array.from({ length: 9 }, (_, i) => ({
+  x: Math.random() * 400, y: Math.random() * 800,
+  vx: (Math.random() - .5) * .44, vy: (Math.random() - .5) * .44,
+  code: i + 1, si: i % 4, ph: Math.random() * Math.PI * 2, r: 22 + Math.random() * 10
+}));
+
+function drawMenu() {
+  ctx.fillStyle = '#060c18'; ctx.fillRect(0, 0, W, H);
+  menuT++;
+  for (const o of menuOrbs) {
+    o.x += o.vx; o.y += o.vy;
+    if (o.x < 0 || o.x > W) o.vx *= -1;
+    if (o.y < 0 || o.y > H) o.vy *= -1;
+    const p = .4 + .4 * Math.sin(menuT * .024 + o.ph);
+    ctx.save(); ctx.globalAlpha = .32 + .28 * p;
+    drawFig(o.x, o.y, o.r * p, o.si, CLR[o.code], AT[`${o.code}_${o.si}`] || '', 0, o.code);
+    ctx.restore();
+  }
+  ctx.fillStyle = 'rgba(6,12,24,.56)'; ctx.fillRect(0, 0, W, H);
+
+  const ts = Math.min(W * .1, 42);
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#00ccff'; ctx.shadowBlur = 22;
+  ctx.fillStyle = '#00ccff'; ctx.font = `bold ${ts}px monospace`;
+  ctx.fillText('НЕЙРО', W / 2, H * .27); ctx.shadowBlur = 0;
+  ctx.fillStyle = '#88eeff'; ctx.font = `bold ${ts * .78}px monospace`;
+  ctx.fillText('АКВАРИУМ', W / 2, H * .27 + ts * .94);
+  ctx.fillStyle = 'rgba(136,238,255,.48)'; ctx.font = `${Math.min(W * .034, 13)}px monospace`;
+  ctx.fillText('слей буквы по форме или коду', W / 2, H * .27 + ts * 1.92);
+  if (hi > 0) {
+    ctx.fillStyle = 'rgba(255,215,0,.42)'; ctx.font = `bold ${Math.min(W * .036, 14)}px monospace`;
+    ctx.fillText(`рекорд: ${hi}`, W / 2, H * .27 + ts * 2.72);
+  }
+
+  const bW = Math.min(W * .55, 195), bH = Math.min(H * .075, 50);
+  const bX = W / 2 - bW / 2, bY = H * .54;
+  ctx.beginPath(); ctx.roundRect(bX, bY, bW, bH, bH / 2);
+  ctx.fillStyle = 'rgba(0,180,220,.22)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(0,180,220,.72)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#88eeff'; ctx.font = `bold ${Math.min(bH * .44, 18)}px monospace`;
+  ctx.textBaseline = 'middle'; ctx.fillText('ИГРАТЬ', W / 2, bY + bH / 2);
+  ctx.textBaseline = 'alphabetic';
+
+  // Кнопка Таблица из меню
+  const tbW = Math.min(W*.45,160), tbH = Math.min(H*.06,40);
+  const tbX = W/2-tbW/2, tbY = H*.54 + Math.min(H*.075,50) + 14;
+  ctx.beginPath(); ctx.roundRect(tbX, tbY, tbW, tbH, tbH/2);
+  ctx.fillStyle = 'rgba(0,180,232,.15)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(0,180,232,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#88eeff'; ctx.font = `bold ${Math.min(tbH*.44,15)}px monospace`;
+  ctx.textBaseline = 'middle'; ctx.fillText('ТАБЛИЦА КОДОВ', W/2, tbY+tbH/2);
+  ctx.textBaseline = 'alphabetic';
+
+  // Правила (краткие)
+  const rules = ['○+○ → ○ (код×2)', '○₁+○₂ → ○₃ (коды складываются)', '○+□ → □ (si сумм % 4)'];
+  ctx.fillStyle = 'rgba(100,200,255,.32)'; ctx.font = `${Math.min(W * .028, 11)}px monospace`;
+  rules.forEach((r, i) => ctx.fillText(r, W / 2, bY + bH + 22 + i * 17));
+
+  ctx.fillStyle = 'rgba(255,215,0,.28)'; ctx.font = `${Math.min(W * .032, 12)}px monospace`;
+  ctx.fillText('← главная', W / 2, H * .92);
+}
+
+// ==================== GAME OVER ====================
+function drawGO() {
+  ctx.fillStyle = 'rgba(0,0,0,.62)'; ctx.fillRect(0, 0, W, H);
+  const ts = Math.min(W * .1, 40);
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#ff5f5f'; ctx.shadowBlur = 18;
+  ctx.fillStyle = '#ff5f5f'; ctx.font = `bold ${ts}px monospace`;
+  ctx.fillText('ПЕРЕПОЛНЕН!', W / 2, H * .3); ctx.shadowBlur = 0;
+  ctx.fillStyle = '#ffd700'; ctx.font = `bold ${ts * .9}px monospace`;
+  ctx.fillText(`★ ${score}`, W / 2, H * .3 + ts * 1.2);
+  if (score >= hi && score > 0) {
+    ctx.fillStyle = '#ff6b9d'; ctx.font = `bold ${ts * .5}px monospace`;
+    ctx.fillText('НОВЫЙ РЕКОРД!', W / 2, H * .3 + ts * 2);
+  }
+
+  const bW = Math.min(W * .55, 192), bH = Math.min(H * .075, 48), bY = H * .54;
+  ctx.beginPath(); ctx.roundRect(W / 2 - bW / 2, bY, bW, bH, bH / 2);
+  ctx.fillStyle = 'rgba(255,215,0,.2)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,215,0,.7)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(bH * .44, 17)}px monospace`;
+  ctx.textBaseline = 'middle'; ctx.fillText('ЕЩЁ РАЗ', W / 2, bY + bH / 2);
+
+  ctx.beginPath(); ctx.roundRect(W / 2 - bW * .4, bY + bH + 12, bW * .8, bH * .8, bH * .4);
+  ctx.fillStyle = 'rgba(70,50,130,.3)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(130,90,220,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = 'rgba(190,160,255,.8)'; ctx.font = `bold ${Math.min(bH * .38, 14)}px monospace`;
+  ctx.fillText('МЕНЮ', W / 2, bY + bH + 12 + bH * .4);
+  ctx.textBaseline = 'alphabetic';
+}
+
+// ==================== ГЛАВНЫЙ ЦИКЛ ====================
+let lastT = 0;
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(t - lastT, 50); lastT = t;
+  ctx.fillStyle = '#060c18'; ctx.fillRect(0, 0, W, H);
+
+  if (screen === 'menu') { drawMenu(); return; }
+  if (screen === 'help') { drawHelp(); return; }
+
+  Engine.update(engine, dt || 16);
+  goTick++;
+  if (goTick % 50 === 0) checkGO();
+
+  // затухание pop-анимации
+  for (const [, f] of figs) { if (f.pop > 0) f.pop = Math.max(0, f.pop - .055); }
+
+  drawAQ();
+  drawBubbles();
+  drawDrop();
+
+  // фигуры
+  for (const [, f] of figs) {
+    drawFig(f.body.position.x, f.body.position.y, f.r, f.si, f.color, f.letter, f.pop, f.code);
+  }
+
+  // частицы слияния
+  particles = particles.filter(p => p.life > 0);
+  for (const p of particles) {
+    ctx.save(); ctx.globalAlpha = p.life / 58;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    p.x += p.vx; p.y += p.vy; p.vy += .12; p.life--;
+  }
+
+  // всплывающие метки слияний
+  mergeLabels = mergeLabels.filter(m => m.life > 0);
+  for (const m of mergeLabels) {
+    ctx.save(); ctx.globalAlpha = Math.min(1, m.life / 20);
+    ctx.fillStyle = m.color;
+    ctx.shadowColor = m.color; ctx.shadowBlur = 8;
+    ctx.font = `bold ${Math.min(W * .065, 24)}px monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(m.letter, m.x, m.y);
+    ctx.restore();
+    m.y += m.vy; m.vy *= .94; m.life--;
+  }
+
+  drawHUD();
+  if (screen === 'gameover') drawGO();
+}
+
+// ==================== ВВОД ====================
+canvas.addEventListener('pointermove', e => {
+  e.preventDefault();
+  if (screen === 'game') aimX = e.clientX;
+}, { passive: false });
+
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  const { clientX: x, clientY: y } = e;
+
+  if (screen === 'menu') {
+    const bH = Math.min(H * .075, 50), bY = H * .54, bW = Math.min(W * .55, 195);
+    if (x >= W/2-bW/2 && x <= W/2+bW/2 && y >= bY && y <= bY+bH) { startGame(); return; }
+    // Кнопка таблицы из меню
+    const tbH2 = Math.min(H*.06,40), tbY2 = bY+bH+14, tbW2 = Math.min(W*.45,160);
+    if (x>=W/2-tbW2/2&&x<=W/2+tbW2/2&&y>=tbY2&&y<=tbY2+tbH2) { prevScreen='menu'; screen='help'; return; }
+    if (y > H * .88) { window.location.href = 'index.html'; return; }
+    return;
+  }
+  if (screen === 'help') {
+    const bH = Math.min(H * .06, 40), bY = H - bH - 8, bW = Math.min(W * .5, 160);
+    if (y >= bY) { screen = prevScreen; return; }
+    return;
+  }
+  if (screen === 'gameover') {
+    const bH = Math.min(H * .075, 48), bY = H * .54, bW = Math.min(W * .55, 192);
+    if (y >= bY && y <= bY + bH) { startGame(); return; }
+    const y2 = bY + bH + 12;
+    if (y >= y2 && y <= y2 + bH * .8) { screen = 'menu'; return; }
+    return;
+  }
+  if (screen === 'game') {
+    // Кнопка ТАБЛ.
+    if (x >= HB.x && x <= HB.x + HB.w && y >= HB.y && y <= HB.y + HB.h) {
+      prevScreen = 'game'; screen = 'help'; return;
+    }
+    aimX = x; doDrop();
+  }
+}, { passive: false });
+
+document.addEventListener('keydown', e => {
+  if ((e.key === ' ' || e.key === 'ArrowDown') && screen === 'game') { e.preventDefault(); doDrop(); }
+  if (e.key === 'ArrowLeft' && screen === 'game')
+    aimX = Math.max(AQ.x + (cur?.r || 20) + 1, aimX - 16);
+  if (e.key === 'ArrowRight' && screen === 'game')
+    aimX = Math.min(AQ.x + AQ.w - (cur?.r || 20) - 1, aimX + 16);
+  if ((e.key === 'Enter' || e.key === ' ') && screen === 'menu') startGame();
+  if ((e.key === 'Enter' || e.key === ' ') && screen === 'gameover') startGame();
+  if (e.key === 'Escape' && screen === 'game') { screen = 'menu'; canDrop = false; }
+  if (e.key === 'Escape' && screen === 'help') { screen = prevScreen; }
+  if (e.key === '?' || e.key === 'h' || e.key === 'H') {
+    if (screen === 'game') { prevScreen = 'game'; screen = 'help'; }
+    else if (screen === 'help') { screen = prevScreen; }
+  }
+});
+
+window.addEventListener('resize', () => {
+  resizeCanvas(); layoutAQ(); buildWalls();
+  if (screen === 'game') aimX = Math.max(AQ.x + 20, Math.min(AQ.x + AQ.w - 20, aimX));
+});
+
+// ==================== СТАРТ ====================
+buildWalls();
+aimX = W / 2; cur = pickDrop(); nxt = pickDrop();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
