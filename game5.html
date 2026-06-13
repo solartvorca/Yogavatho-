@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>НейроТетрис 5.0</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#060c18; overflow:hidden; touch-action:none; font-family:monospace; }
+canvas { display:block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+'use strict';
+
+// ==================== ДАННЫЕ ====================
+const GROUPS = {
+  1:['И','С','Э'],     2:['А','Й','П','Т'],
+  3:['Б','З','М','Ю'], 4:['В','К','Ф','Я'],
+  5:['Д','Л','Х','Ы'], 6:['Е','О','Ц','Ь'],
+  7:['Ё','Н','Ъ'],     8:['Г','У','Ч','Щ'],
+  9:['Ж','Р','Ш']
+};
+const CLR = {
+  1:'#ff5f5f', 2:'#ffd700', 3:'#2ecc71',
+  4:'#1ab8b8', 5:'#4d88ff', 6:'#7dce82',
+  7:'#aaaaaa', 8:'#ff4d8f', 9:'#9b59b6'
+};
+
+// letter → {code, si, color}
+const INFO = {};
+for (const [c, arr] of Object.entries(GROUPS))
+  arr.forEach((l, i) => { INFO[l] = { code:+c, si:i%4, color:CLR[c] }; });
+
+// Тетромино: [dr, dc] от centre pivot
+const TETROS = [
+  [[0,-1],[0,0],[0,1],[0,2]],   // I
+  [[0,0],[0,1],[1,0],[1,1]],    // O
+  [[0,-1],[0,0],[0,1],[1,0]],   // T
+  [[0,0],[0,1],[1,-1],[1,0]],   // S
+  [[0,-1],[0,0],[1,0],[1,1]],   // Z
+  [[0,-1],[0,0],[0,1],[1,1]],   // L
+  [[0,-1],[0,0],[0,1],[1,-1]],  // J
+];
+
+// ==================== CANVAS ====================
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, DPR, CELL, GX, GY;
+const COLS = 8, ROWS = 18;
+const TOP_H = 56, BOT_H = 50;
+
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r) {
+    const R = Array.isArray(r) ? r[0]||0 : (r||0);
+    this.moveTo(x+R,y); this.lineTo(x+w-R,y); this.arcTo(x+w,y,x+w,y+R,R);
+    this.lineTo(x+w,y+h-R); this.arcTo(x+w,y+h,x+w-R,y+h,R);
+    this.lineTo(x+R,y+h); this.arcTo(x,y+h,x,y+h-R,R);
+    this.lineTo(x,y+R); this.arcTo(x,y,x+R,y,R); this.closePath();
+  };
+}
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W*DPR; canvas.height = H*DPR;
+  canvas.style.width = W+'px'; canvas.style.height = H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  CELL = Math.max(26, Math.min(46, Math.floor(Math.min(
+    (W - 6) / COLS,
+    (H - TOP_H - BOT_H - 4) / ROWS
+  ))));
+  GX = Math.floor((W - COLS*CELL) / 2);
+  GY = TOP_H + 2;
+}
+window.addEventListener('resize', () => { resize(); draw(); });
+resize();
+
+// ==================== СОСТОЯНИЕ ====================
+let grid, score, hi, level, linesCleared;
+let piece, nextPiece;
+let screen = 'menu';
+let prevScreen = 'menu';
+let flashSet = new Set();
+let lastDrop, dropInterval;
+let animId = 0;
+const BTN = {};
+
+function mkGrid() {
+  return Array.from({length:ROWS}, () => Array(COLS).fill(null));
+}
+
+// ==================== ФИГУРЫ ====================
+function rndLetter(code) {
+  const a = GROUPS[code];
+  return a[Math.floor(Math.random() * a.length)];
+}
+
+function makePiece() {
+  const shape = TETROS[Math.floor(Math.random() * TETROS.length)];
+  const code = Math.ceil(Math.random() * 9);
+  const cells = shape.map(([dr, dc]) => {
+    const l = rndLetter(code);
+    return { dr, dc, letter:l, ...INFO[l] };
+  });
+  return { cells, row:1, col:Math.floor(COLS/2) };
+}
+
+function abs(p) {
+  return p.cells.map(c => ({
+    r: p.row + c.dr,
+    c: p.col + c.dc,
+    letter:c.letter, code:c.code, si:c.si, color:c.color
+  }));
+}
+
+function valid(p) {
+  return abs(p).every(({r,c}) =>
+    r >= 0 && r < ROWS && c >= 0 && c < COLS && !grid[r][c]
+  );
+}
+
+function rotate(p) {
+  // 90° CW: (dr,dc) → (dc, -dr)
+  const rot = { ...p, cells: p.cells.map(({dr,dc,...rest}) => ({dr:dc, dc:-dr, ...rest})) };
+  if (valid(rot)) return rot;
+  for (const d of [1,-1,2,-2]) {
+    const k = {...rot, col:rot.col+d};
+    if (valid(k)) return k;
+  }
+  return p;
+}
+
+function ghost(p) {
+  let q = p;
+  while (valid({...q, row:q.row+1})) q = {...q, row:q.row+1};
+  return q;
+}
+
+function hardDrop() {
+  piece = ghost(piece);
+  lockPiece();
+}
+
+// ==================== ЛОГИКА ====================
+function startGame() {
+  grid = mkGrid();
+  score = 0; level = 1; linesCleared = 0;
+  hi = +localStorage.getItem('nt5_hi') || 0;
+  flashSet = new Set();
+  piece = makePiece(); nextPiece = makePiece();
+  lastDrop = performance.now();
+  dropInterval = 750;
+  screen = 'game';
+  if (animId) cancelAnimationFrame(animId);
+  animId = requestAnimationFrame(loop);
+}
+
+function lockPiece() {
+  abs(piece).forEach(({r,c,letter,code,si,color}) => {
+    if (r >= 0 && r < ROWS && c >= 0 && c < COLS)
+      grid[r][c] = {letter,code,si,color};
+  });
+  processClears(0);
+  animId = requestAnimationFrame(loop);
+}
+
+function processClears(cascade) {
+  // Полные ряды
+  const fullRows = [];
+  for (let r = 0; r < ROWS; r++)
+    if (grid[r].every(c => c !== null)) fullRows.push(r);
+
+  // Группы 5+ клеток одного кода
+  const groups = findColorGroups(5);
+
+  const toClear = new Set();
+  fullRows.forEach(r => { for (let c = 0; c < COLS; c++) toClear.add(`${r},${c}`); });
+  groups.forEach(g => g.forEach(({r,c}) => toClear.add(`${r},${c}`)));
+
+  if (toClear.size === 0) { spawnNext(); return; }
+
+  const mult = cascade > 0 ? cascade + 1 : 1;
+  const BASE = [0,100,300,500,800];
+  score += (BASE[Math.min(fullRows.length,4)] + groups.length*200) * level * mult;
+  linesCleared += fullRows.length;
+  level = Math.floor(linesCleared / 8) + 1;
+  dropInterval = Math.max(120, 750 - (level-1)*70);
+  if (score > hi) { hi = score; localStorage.setItem('nt5_hi', hi); }
+
+  flashSet = toClear;
+
+  setTimeout(() => {
+    toClear.forEach(key => {
+      const [r,c] = key.split(',').map(Number);
+      if (grid[r]) grid[r][c] = null;
+    });
+    flashSet = new Set();
+    applyGravity();
+    processClears(cascade + 1);
+  }, 380);
+}
+
+function applyGravity() {
+  for (let c = 0; c < COLS; c++) {
+    const col = [];
+    for (let r = 0; r < ROWS; r++) if (grid[r][c]) col.push(grid[r][c]);
+    for (let r = 0; r < ROWS; r++)
+      grid[r][c] = r < ROWS - col.length ? null : col[r - (ROWS - col.length)];
+  }
+}
+
+function spawnNext() {
+  piece = nextPiece;
+  nextPiece = makePiece();
+  lastDrop = performance.now();
+  if (!valid(piece)) {
+    if (score > hi) { hi = score; localStorage.setItem('nt5_hi', hi); }
+    screen = 'gameover';
+  }
+}
+
+function findColorGroups(minSize) {
+  const vis = Array.from({length:ROWS}, () => Array(COLS).fill(false));
+  const result = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (grid[r][c] && !vis[r][c]) {
+        const code = grid[r][c].code;
+        const group = [];
+        const stk = [{r,c}];
+        while (stk.length) {
+          const {r:cr,c:cc} = stk.pop();
+          if (cr<0||cr>=ROWS||cc<0||cc>=COLS||vis[cr][cc]||!grid[cr][cc]||grid[cr][cc].code!==code) continue;
+          vis[cr][cc] = true;
+          group.push({r:cr,c:cc});
+          stk.push({r:cr-1,c:cc},{r:cr+1,c:cc},{r:cr,c:cc-1},{r:cr,c:cc+1});
+        }
+        if (group.length >= minSize) result.push(group);
+      }
+    }
+  }
+  return result;
+}
+
+// ==================== ГЛАВНЫЙ ЦИКЛ ====================
+function loop(ts) {
+  draw();
+  if (screen !== 'game') return;
+  if (flashSet.size > 0) { animId = requestAnimationFrame(loop); return; }
+
+  if (ts - lastDrop > dropInterval) {
+    lastDrop = ts;
+    const moved = {...piece, row:piece.row+1};
+    if (valid(moved)) { piece = moved; }
+    else { lockPiece(); return; }
+  }
+  animId = requestAnimationFrame(loop);
+}
+
+// ==================== ОТРИСОВКА ====================
+function drawCell(x, y, sz, cell, flash) {
+  const {letter, code, si, color} = cell;
+  const pad = sz >= 32 ? 3 : sz >= 20 ? 2 : 1;
+  const inner = sz - pad * 2;
+  const r = inner * 0.45;
+
+  ctx.save();
+  ctx.translate(x + sz/2, y + sz/2);
+
+  ctx.fillStyle = flash ? '#ffffff' : color + 'cc';
+  ctx.shadowColor = flash ? '#fff' : color;
+  ctx.shadowBlur = flash ? 12 : 5;
+  ctx.beginPath();
+  if (si === 0) {
+    ctx.arc(0, 0, r, 0, Math.PI*2);
+  } else if (si === 1) {
+    ctx.roundRect(-r, -r, r*2, r*2, r*0.24);
+  } else if (si === 2) {
+    ctx.moveTo(0, -r); ctx.lineTo(r*0.88, r*0.62); ctx.lineTo(-r*0.88, r*0.62); ctx.closePath();
+  } else {
+    ctx.moveTo(0, -r); ctx.lineTo(r*0.7, 0); ctx.lineTo(0, r); ctx.lineTo(-r*0.7, 0); ctx.closePath();
+  }
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.strokeStyle = flash ? '#ffff00' : 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = flash ? 2 : 1;
+  ctx.stroke();
+
+  // Буква
+  const fs = Math.max(10, inner * 0.46);
+  ctx.font = `bold ${fs}px Segoe UI, Arial`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+  ctx.lineWidth = Math.max(1.5, fs * 0.2);
+  ctx.lineJoin = 'round';
+  ctx.strokeText(letter, 0, 0);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(letter, 0, 0);
+
+  // Код (только при достаточном размере)
+  if (sz >= 24) {
+    const nf = Math.max(7, inner * 0.23);
+    ctx.font = `bold ${nf}px Segoe UI, Arial`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+    ctx.lineWidth = Math.max(1.2, nf * 0.22);
+    ctx.strokeText(String(code), inner*0.3, inner*0.3);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillText(String(code), inner*0.3, inner*0.3);
+  }
+
+  ctx.restore();
+}
+
+function rrect(x, y, w, h, r, fill, stroke) {
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); }
+}
+
+function drawBoard() {
+  // Фон игрового поля
+  ctx.fillStyle = '#0d1525';
+  ctx.fillRect(GX, GY, COLS*CELL, ROWS*CELL);
+
+  // Сетка
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 0.5;
+  for (let r = 0; r <= ROWS; r++) {
+    ctx.beginPath(); ctx.moveTo(GX, GY+r*CELL); ctx.lineTo(GX+COLS*CELL, GY+r*CELL); ctx.stroke();
+  }
+  for (let c = 0; c <= COLS; c++) {
+    ctx.beginPath(); ctx.moveTo(GX+c*CELL, GY); ctx.lineTo(GX+c*CELL, GY+ROWS*CELL); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(80,130,255,0.3)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(GX, GY, COLS*CELL, ROWS*CELL);
+
+  const now = performance.now();
+  const fl = flashSet.size > 0 && Math.sin(now / 80) > 0;
+
+  // Зафиксированные клетки
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (grid[r][c])
+        drawCell(GX+c*CELL, GY+r*CELL, CELL, grid[r][c], fl && flashSet.has(`${r},${c}`));
+
+  // Призрак + активная фигура
+  if (piece && flashSet.size === 0) {
+    const g = ghost(piece);
+    ctx.save(); ctx.globalAlpha = 0.18;
+    abs(g).forEach(({r,c,...rest}) => { if(r>=0) drawCell(GX+c*CELL, GY+r*CELL, CELL, rest, false); });
+    ctx.restore();
+    abs(piece).forEach(({r,c,...rest}) => { if(r>=0) drawCell(GX+c*CELL, GY+r*CELL, CELL, rest, false); });
+  }
+}
+
+function drawHUD() {
+  // Верхняя полоса
+  ctx.fillStyle = '#060c18';
+  ctx.fillRect(0, 0, W, GY - 2);
+
+  const ty = GY / 2;
+  ctx.textBaseline = 'middle';
+
+  ctx.font = 'bold 11px monospace'; ctx.fillStyle = '#667'; ctx.textAlign = 'left';
+  ctx.fillText('СЧЁТ', GX, ty - 8);
+  ctx.font = 'bold 20px monospace'; ctx.fillStyle = '#ffd700';
+  ctx.fillText(score, GX, ty + 8);
+
+  ctx.font = 'bold 11px monospace'; ctx.fillStyle = '#667'; ctx.textAlign = 'center';
+  ctx.fillText('УРОВЕНЬ', W/2, ty - 8);
+  ctx.font = 'bold 20px monospace'; ctx.fillStyle = '#88eeff';
+  ctx.fillText(level, W/2, ty + 8);
+
+  // Следующая фигура (мини)
+  if (nextPiece) {
+    const ns = Math.max(12, Math.floor(CELL * 0.5));
+    const minDr = Math.min(...nextPiece.cells.map(c=>c.dr));
+    const minDc = Math.min(...nextPiece.cells.map(c=>c.dc));
+    const nW = (Math.max(...nextPiece.cells.map(c=>c.dc)) - minDc + 1) * ns;
+    const nH = (Math.max(...nextPiece.cells.map(c=>c.dr)) - minDr + 1) * ns;
+    const px = GX + COLS*CELL - nW - 2;
+    const py = (GY - 2 - nH) / 2;
+    ctx.font = 'bold 9px monospace'; ctx.fillStyle = '#667'; ctx.textAlign = 'right';
+    ctx.fillText('СЛЕД.', GX + COLS*CELL, 10);
+    nextPiece.cells.forEach(cell => {
+      drawCell(px + (cell.dc - minDc)*ns, py + (cell.dr - minDr)*ns, ns,
+        {letter:cell.letter, code:cell.code, si:cell.si, color:cell.color}, false);
+    });
+  }
+
+  // Нижняя полоса
+  const by = GY + ROWS * CELL + 2;
+  ctx.fillStyle = '#060c18';
+  ctx.fillRect(0, by, W, H - by);
+
+  const bw = 70, bh = 36, gap = 8;
+  const tot = 3 * bw + 2 * gap;
+  const bx0 = (W - tot) / 2;
+  const bby = by + (H - by - bh) / 2;
+
+  ['ТАБЛ.', 'ПАУЗА', 'МЕНЮ'].forEach((lbl, i) => {
+    const bx = bx0 + i*(bw+gap);
+    BTN[lbl] = {x:bx, y:bby, w:bw, h:bh};
+    ctx.lineWidth = 1;
+    rrect(bx, bby, bw, bh, 7, 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.18)');
+    ctx.font = 'bold 13px monospace'; ctx.fillStyle = '#ccc';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(lbl, bx+bw/2, bby+bh/2);
+  });
+
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  ctx.font = 'bold 10px monospace'; ctx.fillStyle = '#445';
+  ctx.fillText('РЕК ' + hi, GX + COLS*CELL, by + (H-by)/2);
+}
+
+function drawMenu() {
+  ctx.fillStyle = '#060c18';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const cx = W/2;
+
+  ctx.font = `bold ${Math.min(34, W*0.087)}px Segoe UI`;
+  ctx.fillStyle = '#ffd700';
+  ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 24;
+  ctx.fillText('НЕЙРО', cx, H*0.2);
+  ctx.fillText('ТЕТРИС 5.0', cx, H*0.28);
+  ctx.shadowBlur = 0;
+
+  ctx.font = `${Math.min(13, W*0.033)}px Segoe UI`;
+  ctx.fillStyle = '#556677';
+  ctx.fillText('Каждый квадрат — буква с кодом, цветом и формой', cx, H*0.37);
+  ctx.fillStyle = '#445566';
+  ctx.fillText('5+ клеток одного цвета рядом → автоочистка', cx, H*0.43);
+  ctx.fillText('Фигура одного цвета = одна кодовая группа', cx, H*0.49);
+
+  // Кнопка ИГРАТЬ
+  const bw = 160, bh = 50, bx = cx-bw/2, bby = H*0.58;
+  BTN['СТАРТ'] = {x:bx, y:bby, w:bw, h:bh};
+  ctx.lineWidth = 2;
+  rrect(bx, bby, bw, bh, 12, 'rgba(255,215,0,0.15)', '#ffd700');
+  ctx.font = `bold ${Math.min(22, W*0.056)}px Segoe UI`;
+  ctx.fillStyle = '#ffd700';
+  ctx.fillText('ИГРАТЬ', cx, bby+bh/2);
+
+  // Кнопка ТАБЛИЦА
+  const tbw = 130, tbh = 38, tbx = cx-tbw/2, tby = bby+bh+14;
+  BTN['ТАБ_МЕНЮ'] = {x:tbx, y:tby, w:tbw, h:tbh};
+  ctx.lineWidth = 1.5;
+  rrect(tbx, tby, tbw, tbh, 9, 'rgba(100,160,255,0.1)', 'rgba(100,160,255,0.45)');
+  ctx.font = `${Math.min(14, W*0.036)}px Segoe UI`;
+  ctx.fillStyle = '#88aaff';
+  ctx.fillText('ТАБЛИЦА КОДОВ', cx, tby+tbh/2);
+
+  // Кнопка НА ГЛАВНУЮ
+  const gbw = 120, gbh = 30, gbx = cx-gbw/2, gby = tby+tbh+10;
+  BTN['ГЛАВНАЯ'] = {x:gbx, y:gby, w:gbw, h:gbh};
+  ctx.lineWidth = 1;
+  rrect(gbx, gby, gbw, gbh, 7, 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0.12)');
+  ctx.font = `12px Segoe UI`; ctx.fillStyle = '#445';
+  ctx.fillText('← НА ГЛАВНУЮ', cx, gby+gbh/2);
+}
+
+function drawHelp() {
+  ctx.fillStyle = '#060c18';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+  ctx.font = `bold ${Math.min(17, W*0.043)}px Segoe UI`;
+  ctx.fillStyle = '#ffd700';
+  ctx.fillText('ТАБЛИЦА КОДОВ БУКВ', W/2, 22);
+
+  const margin = 6;
+  const colW = Math.floor((W - margin*2) / 9);
+  const maxRows = 4;
+  const startY = 42;
+  const cellH = Math.floor((H - startY - 52) / maxRows);
+  const cellSz = Math.min(colW - 4, cellH - 4);
+
+  for (let code = 1; code <= 9; code++) {
+    const letters = GROUPS[code];
+    const cx = margin + (code-1)*colW + colW/2;
+
+    ctx.font = `bold ${Math.min(13, colW*0.38)}px monospace`;
+    ctx.fillStyle = CLR[code];
+    ctx.shadowColor = CLR[code]; ctx.shadowBlur = 8;
+    ctx.fillText(String(code), cx, startY - 10);
+    ctx.shadowBlur = 0;
+
+    letters.forEach((letter, i) => {
+      const si = i % 4;
+      const y = startY + i * (cellH + 2);
+      const lx = margin + (code-1)*colW + (colW - cellSz)/2;
+      drawCell(lx, y, cellSz, { letter, code, si, color:CLR[code] }, false);
+    });
+  }
+
+  const bbw = 110, bbh = 32, bbx = W/2-bbw/2, bby = H - 40;
+  BTN['НАЗАД'] = {x:bbx, y:bby, w:bbw, h:bbh};
+  ctx.lineWidth = 1.5;
+  rrect(bbx, bby, bbw, bbh, 8, 'rgba(100,160,255,0.13)', 'rgba(100,160,255,0.5)');
+  ctx.font = 'bold 14px Segoe UI'; ctx.fillStyle = '#88aaff';
+  ctx.fillText('← НАЗАД', W/2, bby+bbh/2);
+}
+
+function drawGameOver() {
+  drawBoard(); drawHUD();
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const cx = W/2, cy = H/2;
+
+  ctx.font = `bold ${Math.min(26,W*0.066)}px Segoe UI`;
+  ctx.fillStyle = '#ff5f5f'; ctx.shadowColor='#ff5f5f'; ctx.shadowBlur=18;
+  ctx.fillText('ИГРА ОКОНЧЕНА', cx, cy - 58);
+  ctx.shadowBlur = 0;
+
+  ctx.font = `${Math.min(20,W*0.051)}px Segoe UI`;
+  ctx.fillStyle = '#ffd700';
+  ctx.fillText('Счёт: ' + score, cx, cy - 18);
+  ctx.font = `${Math.min(14,W*0.036)}px Segoe UI`;
+  ctx.fillStyle = '#aaa';
+  ctx.fillText('Рекорд: ' + hi, cx, cy + 14);
+
+  const bw=140, bh=46, bx=cx-bw/2, bby=cy+40;
+  BTN['ЕЩЁРАЗ'] = {x:bx, y:bby, w:bw, h:bh};
+  ctx.lineWidth = 2;
+  rrect(bx, bby, bw, bh, 10, 'rgba(255,215,0,0.18)', '#ffd700');
+  ctx.font = `bold ${Math.min(18,W*0.046)}px Segoe UI`; ctx.fillStyle='#ffd700';
+  ctx.fillText('ЕЩЁ РАЗ', cx, bby+bh/2);
+
+  const mw=130, mh=34, mx=cx-mw/2, my=bby+bh+12;
+  BTN['МЕНЮ_ГО'] = {x:mx, y:my, w:mw, h:mh};
+  ctx.lineWidth = 1;
+  rrect(mx, my, mw, mh, 8, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.18)');
+  ctx.font = '14px Segoe UI'; ctx.fillStyle = '#888';
+  ctx.fillText('В МЕНЮ', cx, my+mh/2);
+}
+
+function drawPause() {
+  drawBoard(); drawHUD();
+  ctx.fillStyle = 'rgba(0,0,0,0.62)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `bold ${Math.min(30,W*0.077)}px Segoe UI`;
+  ctx.fillStyle = '#88eeff'; ctx.shadowColor='#88eeff'; ctx.shadowBlur=18;
+  ctx.fillText('ПАУЗА', W/2, H/2 - 16);
+  ctx.shadowBlur = 0;
+  ctx.font = `${Math.min(13,W*0.033)}px Segoe UI`;
+  ctx.fillStyle = '#778899';
+  ctx.fillText('Нажмите P или кнопку для продолжения', W/2, H/2+18);
+}
+
+function draw() {
+  ctx.fillStyle = '#060c18';
+  ctx.fillRect(0, 0, W, H);
+  switch(screen) {
+    case 'menu':     drawMenu();     break;
+    case 'game':     drawBoard(); drawHUD(); break;
+    case 'help':     drawHelp();     break;
+    case 'gameover': drawGameOver(); break;
+    case 'pause':    drawPause();    break;
+  }
+}
+
+// ==================== УПРАВЛЕНИЕ ====================
+function inBtn(k, mx, my) {
+  const b = BTN[k];
+  return b && mx>=b.x && mx<=b.x+b.w && my>=b.y && my<=b.y+b.h;
+}
+
+function tapGame(mx, my) {
+  if (flashSet.size > 0) return;
+  if (inBtn('ТАБЛ.',mx,my))  { prevScreen='game'; screen='help'; draw(); return; }
+  if (inBtn('ПАУЗА',mx,my)) { screen='pause'; draw(); return; }
+  if (inBtn('МЕНЮ',mx,my))  { screen='menu'; draw(); return; }
+  // поле: левая половина ← | правая половина → поворот
+  if (mx < GX + COLS*CELL/2) { const m={...piece,col:piece.col-1}; if(valid(m)) piece=m; }
+  else piece = rotate(piece);
+}
+
+function handleTap(mx, my) {
+  switch(screen) {
+    case 'menu':
+      if (inBtn('СТАРТ',mx,my))    { startGame(); return; }
+      if (inBtn('ТАБ_МЕНЮ',mx,my)) { prevScreen='menu'; screen='help'; draw(); return; }
+      if (inBtn('ГЛАВНАЯ',mx,my))  { window.location.href='index.html'; return; }
+      break;
+    case 'game':     tapGame(mx, my); break;
+    case 'help':
+      if (inBtn('НАЗАД',mx,my)) {
+        screen = prevScreen;
+        if (screen==='game') animId = requestAnimationFrame(loop);
+        else draw();
+      }
+      break;
+    case 'gameover':
+      if (inBtn('ЕЩЁРАЗ',mx,my))  { startGame(); return; }
+      if (inBtn('МЕНЮ_ГО',mx,my)) { screen='menu'; draw(); return; }
+      break;
+    case 'pause':
+      screen = 'game'; animId = requestAnimationFrame(loop); break;
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (screen === 'help') {
+    if (e.key==='Escape'||e.key==='h'||e.key==='H') {
+      screen = prevScreen;
+      if (screen==='game') animId = requestAnimationFrame(loop); else draw();
+    }
+    return;
+  }
+  if (screen === 'menu') { if(e.key==='Enter'||e.key===' ') startGame(); return; }
+  if (screen === 'gameover') { if(e.key==='Enter'||e.key==='r'||e.key==='R') startGame(); return; }
+  if (screen === 'pause') {
+    if (e.key==='p'||e.key==='P'||e.key==='Escape') { screen='game'; animId=requestAnimationFrame(loop); }
+    return;
+  }
+  if (screen !== 'game' || flashSet.size > 0) return;
+
+  switch(e.key) {
+    case 'ArrowLeft':  { const m={...piece,col:piece.col-1}; if(valid(m)) piece=m; e.preventDefault(); break; }
+    case 'ArrowRight': { const m={...piece,col:piece.col+1}; if(valid(m)) piece=m; e.preventDefault(); break; }
+    case 'ArrowDown':  {
+      const m={...piece,row:piece.row+1};
+      if(valid(m)) { piece=m; lastDrop=performance.now(); } else lockPiece();
+      e.preventDefault(); break;
+    }
+    case 'ArrowUp': case 'z': case 'Z': piece=rotate(piece); e.preventDefault(); break;
+    case ' ': hardDrop(); e.preventDefault(); break;
+    case 'p': case 'P': screen='pause'; draw(); break;
+    case 'Escape': screen='menu'; draw(); break;
+  }
+});
+
+// Touch
+let t0 = null;
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  t0 = {x:e.touches[0].clientX, y:e.touches[0].clientY, t:Date.now()};
+}, {passive:false});
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (!t0) return;
+  const dx = e.changedTouches[0].clientX - t0.x;
+  const dy = e.changedTouches[0].clientY - t0.y;
+  const adx=Math.abs(dx), ady=Math.abs(dy);
+
+  if (adx<14 && ady<14) {
+    handleTap(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+  } else if (screen==='game' && flashSet.size===0) {
+    if (adx > ady) {
+      // горизонтальный свайп
+      const steps = Math.max(1, Math.round(adx / CELL));
+      const dir = dx > 0 ? 1 : -1;
+      let p = {...piece};
+      for (let i=0; i<steps; i++) { const m={...p,col:p.col+dir}; if(valid(m)) p=m; else break; }
+      piece = p;
+    } else if (dy > 50) {
+      hardDrop();
+    } else if (dy < -30) {
+      piece = rotate(piece);
+    }
+  }
+  t0 = null;
+}, {passive:false});
+
+canvas.addEventListener('click', e => {
+  handleTap(e.clientX, e.clientY);
+});
+
+// ==================== СТАРТ ====================
+hi = +localStorage.getItem('nt5_hi') || 0;
+draw();
+</script>
+</body>
+</html>
