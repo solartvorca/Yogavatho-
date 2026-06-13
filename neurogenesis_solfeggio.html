@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Нейрогенез x Solfeggio — 9 Струн Памяти</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Cormorant+Garamond:wght@300;400;600&display=swap');
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a12;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            color: white;
+        }
+
+        .serif { font-family: 'Cormorant Garamond', serif; }
+
+        .start-overlay {
+            position: fixed; inset: 0; background: #0a0a12; z-index: 100;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.8s ease;
+        }
+        .start-overlay.hidden { opacity: 0; pointer-events: none; }
+        .start-btn {
+            padding: 18px 50px; border: 1px solid rgba(255,255,255,0.2); background: transparent;
+            color: white; font-size: 13px; letter-spacing: 4px; text-transform: uppercase;
+            cursor: pointer; transition: all 0.4s ease; border-radius: 4px;
+        }
+        .start-btn:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.4); letter-spacing: 6px; }
+
+        .main-wrapper { width: 100vw; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        .top-bar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+            background: rgba(10,10,18,0.85); backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .game-area {
+            flex: 1; display: flex; flex-direction: column;
+            margin-top: 110px; margin-bottom: 70px;
+            overflow: hidden;
+        }
+
+        .scroll-container {
+            flex: 1; width: 100%; overflow-x: auto; overflow-y: hidden;
+            display: flex; align-items: center;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .scroll-container::-webkit-scrollbar { display: none; }
+
+        .strings-wrapper {
+            display: flex; align-items: center; gap: 2vw;
+            padding: 0 4vw; min-width: max-content; height: 100%;
+        }
+
+        .string-column {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 10px; position: relative; flex-shrink: 0;
+        }
+
+        .string-line {
+            position: absolute; left: 50%; top: 0; bottom: 0;
+            width: 1px; background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent);
+            transform: translateX(-50%); pointer-events: none; z-index: 0;
+        }
+
+        .neuro-btn {
+            width: 72px; height: 72px; border-radius: 50%;
+            border: 1.5px solid rgba(255,255,255,0.12);
+            background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.08), rgba(255,255,255,0.01));
+            backdrop-filter: blur(8px); cursor: pointer;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            flex-shrink: 0; z-index: 2;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .neuro-btn::before {
+            content: ''; position: absolute; inset: 0; border-radius: 50%;
+            padding: 1.5px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.25), transparent 60%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude;
+            opacity: 0.4;
+        }
+
+        .neuro-btn:hover { transform: scale(1.08); border-color: rgba(255,255,255,0.3); }
+
+        .neuro-btn.active {
+            transform: scale(1.15);
+            box-shadow: 0 0 40px var(--glow-color), inset 0 0 20px var(--glow-color);
+            border-color: var(--glow-color);
+            background: radial-gradient(circle at 35% 35%, var(--glow-color-soft), rgba(255,255,255,0.05));
+        }
+
+        .neuro-btn.active::after {
+            content: ''; position: absolute; inset: -5px; border-radius: 50%;
+            border: 2px solid var(--glow-color); opacity: 0.6;
+            animation: rippleRing 1.8s ease-out infinite;
+        }
+
+        .neuro-btn.found-anim {
+            animation: foundPulse 0.6s ease-out forwards;
+        }
+
+        .neuro-btn.wrong-anim {
+            animation: wrongShake 0.4s ease-in-out;
+        }
+
+        @keyframes rippleRing {
+            0% { transform: scale(1); opacity: 0.6; }
+            100% { transform: scale(1.6); opacity: 0; }
+        }
+        @keyframes foundPulse {
+            0% { transform: scale(1.15); }
+            50% { transform: scale(1.3); filter: brightness(1.5); }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        @keyframes wrongShake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
+        }
+
+        .btn-letter {
+            font-size: 20px; font-weight: 300; letter-spacing: 1px;
+            color: rgba(255,255,255,0.9); line-height: 1;
+        }
+        .btn-shape {
+            width: 22px; height: 22px; margin-top: 2px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-number {
+            font-size: 9px; color: rgba(255,255,255,0.5); margin-top: 1px; letter-spacing: 1px;
+        }
+
+        .shape-circle { width: 18px; height: 18px; border-radius: 50%; }
+        .shape-square { width: 16px; height: 16px; border-radius: 4px; }
+        .shape-triangle {
+            width: 0; height: 0;
+            border-left: 9px solid transparent; border-right: 9px solid transparent;
+            border-bottom: 16px solid currentColor;
+        }
+        .shape-diamond {
+            width: 14px; height: 14px; transform: rotate(45deg); border-radius: 2px;
+        }
+
+        .string-label {
+            font-size: 9px; color: rgba(255,255,255,0.35); letter-spacing: 2px;
+            text-transform: uppercase; text-align: center; margin-top: 4px;
+        }
+        .string-freq {
+            font-size: 8px; color: rgba(255,255,255,0.25); letter-spacing: 1px; margin-top: 1px;
+        }
+
+        .game-panel {
+            position: fixed; top: 50px; left: 50%; transform: translateX(-50%);
+            z-index: 25; display: flex; flex-direction: column; align-items: center;
+            gap: 6px; pointer-events: none;
+        }
+
+        .mission-box {
+            background: rgba(255,255,255,0.06); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+            padding: 10px 24px; text-align: center;
+            animation: missionIn 0.4s ease-out;
+        }
+        @keyframes missionIn {
+            from { opacity: 0; transform: translateY(-10px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .mission-text { font-size: 13px; letter-spacing: 1px; color: rgba(255,255,255,0.8); }
+        .mission-sub { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+        .progress-bar {
+            width: 200px; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%; background: linear-gradient(90deg, rgba(255,255,255,0.4), rgba(255,255,255,0.7));
+            border-radius: 2px; transition: width 0.3s ease;
+        }
+
+        .stats-row {
+            display: flex; gap: 16px; font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 1px;
+        }
+        .stats-row span { display: flex; align-items: center; gap: 4px; }
+        .stats-row .highlight { color: rgba(255,255,255,0.7); }
+
+        .controls-bar {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+            background: rgba(10,10,18,0.85); backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            display: flex; justify-content: center; align-items: center;
+            gap: 8px; padding: 10px 16px; flex-wrap: wrap;
+        }
+
+        .ctrl-btn {
+            padding: 7px 16px; border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.5);
+            font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+            cursor: pointer; transition: all 0.3s ease; border-radius: 20px;
+            white-space: nowrap;
+        }
+        .ctrl-btn:hover { border-color: rgba(255,255,255,0.25); color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.05); }
+        .ctrl-btn.active { border-color: rgba(255,255,255,0.4); color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.1); }
+        .ctrl-btn.recording { border-color: rgba(255,60,60,0.4); color: rgba(255,100,100,0.9); animation: recPulse 1s infinite; }
+        @keyframes recPulse { 0%,100%{box-shadow:0 0 0 rgba(255,60,60,0);} 50%{box-shadow:0 0 12px rgba(255,60,60,0.2);} }
+        .ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .visualizer {
+            position: fixed; bottom: 60px; left: 0; right: 0; height: 100px;
+            pointer-events: none; opacity: 0.25; z-index: 5;
+        }
+
+        .particle {
+            position: fixed; width: 2px; height: 2px; border-radius: 50%;
+            background: rgba(255,255,255,0.5); pointer-events: none; z-index: 1;
+            animation: floatUp 12s infinite ease-in-out;
+        }
+        @keyframes floatUp {
+            0%,100% { transform: translateY(0) translateX(0); opacity: 0; }
+            10% { opacity: 0.8; }
+            90% { opacity: 0.6; }
+            100% { transform: translateY(-100vh) translateX(30px); opacity: 0; }
+        }
+
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 60;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.show { opacity: 1; pointer-events: all; }
+        .modal-box {
+            background: rgba(15,15,25,0.95); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+            padding: 28px 32px; max-width: 340px; width: 90%; text-align: center;
+            transform: scale(0.9); transition: transform 0.3s ease;
+        }
+        .modal-overlay.show .modal-box { transform: scale(1); }
+        .modal-title { font-size: 18px; letter-spacing: 2px; margin-bottom: 12px; }
+        .modal-text { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.6; margin-bottom: 20px; }
+        .modal-btn {
+            padding: 10px 28px; border: 1px solid rgba(255,255,255,0.2); background: transparent;
+            color: white; font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+            cursor: pointer; border-radius: 4px; transition: all 0.3s ease;
+        }
+        .modal-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.4); }
+
+        .scroll-hint {
+            position: fixed; bottom: 75px; left: 50%; transform: translateX(-50%);
+            font-size: 9px; color: rgba(255,255,255,0.15); letter-spacing: 2px;
+            animation: hintPulse 2.5s ease-in-out infinite; z-index: 10; pointer-events: none;
+        }
+        @keyframes hintPulse { 0%,100%{opacity:0.1;} 50%{opacity:0.35;} }
+
+        @media (max-width: 768px) {
+            .neuro-btn { width: 58px; height: 58px; }
+            .btn-letter { font-size: 16px; }
+            .btn-shape { width: 18px; height: 18px; }
+            .shape-circle { width: 14px; height: 14px; }
+            .shape-square { width: 12px; height: 12px; }
+            .shape-triangle { border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 12px solid currentColor; }
+            .shape-diamond { width: 10px; height: 10px; }
+            .btn-number { font-size: 7px; }
+            .strings-wrapper { gap: 3vw; padding: 0 3vw; }
+            .game-area { margin-top: 95px; margin-bottom: 60px; }
+            .ctrl-btn { padding: 6px 12px; font-size: 8px; }
+            .mission-box { padding: 8px 16px; }
+            .mission-text { font-size: 11px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="start-overlay" id="startOverlay">
+    <div class="text-center mb-10">
+        <h2 class="serif text-3xl text-white/80 mb-3 tracking-[0.2em]">Нейрогенез</h2>
+        <p class="text-white/30 text-xs tracking-[0.3em] uppercase mb-1">x Solfeggio Frequencies</p>
+        <p class="text-white/20 text-[10px] tracking-wider">9 Струн Памяти</p>
+    </div>
+    <button class="start-btn" onclick="initApp()">Войти в звук</button>
+    <p class="text-white/15 text-[9px] mt-6 tracking-wider">Нажмите, чтобы включить аудио</p>
+</div>
+
+<div class="top-bar">
+    <div class="flex items-center justify-between px-4 py-2.5">
+        <div class="flex items-center gap-2">
+            <span class="serif text-sm text-white/60 tracking-wider">Нейрогенез</span>
+            <span class="text-white/20 text-[9px]">x</span>
+            <span class="text-white/30 text-[9px] tracking-wider">Solfeggio</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <button class="ctrl-btn text-[8px] py-1 px-3" id="modeLearn" onclick="setMode('learn')">Обучение</button>
+            <button class="ctrl-btn text-[8px] py-1 px-3" id="modeGame" onclick="setMode('game')">Поиск</button>
+        </div>
+    </div>
+</div>
+
+<div class="game-panel" id="gamePanel" style="display:none;">
+    <div class="mission-box" id="missionBox">
+        <div class="mission-text" id="missionText">Найди все числа 5</div>
+        <div class="mission-sub" id="missionSub">Нажми на голубые элементы</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="stats-row">
+        <span>Найдено: <b class="highlight" id="foundCount">0</b>/<b id="totalCount">4</b></span>
+        <span>Ошибки: <b class="highlight" id="errorCount" style="color:#ff6666">0</b>/3</span>
+        <span>Время: <b class="highlight" id="timeDisplay">30</b>с</span>
+    </div>
+</div>
+
+<div class="main-wrapper">
+    <div class="game-area">
+        <div class="scroll-container" id="scrollContainer">
+            <div class="strings-wrapper" id="stringsWrapper"></div>
+        </div>
+    </div>
+</div>
+
+<div class="scroll-hint" id="scrollHint">&larr; листай, чтобы увидеть все струны &rarr;</div>
+
+<canvas class="visualizer" id="visualizer"></canvas>
+
+<div class="controls-bar">
+    <button class="ctrl-btn" id="droneBtn" onclick="toggleDrone()">Drone</button>
+    <button class="ctrl-btn" id="recBtn" onclick="toggleRecording()">&#9679; Rec</button>
+    <button class="ctrl-btn" id="playBtn" onclick="playRecording()" disabled>&#9654; Play</button>
+    <button class="ctrl-btn" onclick="stopAll()">&#9632; Стоп</button>
+    <button class="ctrl-btn" onclick="scrollToStart()">&larr; Начало</button>
+    <button class="ctrl-btn" onclick="scrollToEnd()">Конец &rarr;</button>
+</div>
+
+<div class="modal-overlay" id="winModal">
+    <div class="modal-box">
+        <div class="modal-title serif">Уровень пройден!</div>
+        <div class="modal-text" id="winText">Вы отлично запоминаете число 5</div>
+        <button class="modal-btn" onclick="nextLevel()">Следующий уровень</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="loseModal">
+    <div class="modal-box">
+        <div class="modal-title serif" style="color:#ff8888">Попробуйте снова</div>
+        <div class="modal-text" id="loseText">Слишком много ошибок. Повторите обучение.</div>
+        <button class="modal-btn" onclick="restartLevel()">Повторить</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="completeModal">
+    <div class="modal-box">
+        <div class="modal-title serif" style="color:#88ff88">Все уровни пройдены!</div>
+        <div class="modal-text">Вы освоили таблицу Нейрогенез. Каждое число теперь связано с цветом, фигурой и звуком.</div>
+        <button class="modal-btn" onclick="resetGame()">Начать заново</button>
+    </div>
+</div>
+
+<script>
+// ===================== DATA =====================
+const neuroData = [
+    {
+        number: 1, color: '#FF4444', colorName: 'красный', colorSoft: 'rgba(255,68,68,0.3)',
+        freq: 174, freqName: 'Foundation',
+        letters: [
+            { letter: 'И', shape: 'circle', shapeName: 'круг' },
+            { letter: 'С', shape: 'square', shapeName: 'квадрат' },
+            { letter: 'Э', shape: 'triangle', shapeName: 'треугольник' }
+        ]
+    },
+    {
+        number: 2, color: '#FFCC00', colorName: 'жёлтый', colorSoft: 'rgba(255,204,0,0.3)',
+        freq: 285, freqName: 'Quantum',
+        letters: [
+            { letter: 'А', shape: 'circle', shapeName: 'круг' },
+            { letter: 'Й', shape: 'square', shapeName: 'квадрат' },
+            { letter: 'П', shape: 'triangle', shapeName: 'треугольник' },
+            { letter: 'Т', shape: 'diamond', shapeName: 'ромб' }
+        ]
+    },
+    {
+        number: 3, color: '#44DD44', colorName: 'зелёный', colorSoft: 'rgba(68,221,68,0.3)',
+        freq: 369, freqName: 'Universe',
+        letters: [
+            { letter: 'Б', shape: 'circle', shapeName: 'круг' },
+            { letter: 'З', shape: 'square', shapeName: 'квадрат' },
+            { letter: 'М', shape: 'triangle', shapeName: 'треугольник' },
+            { letter: 'Ю', shape: 'diamond', shapeName: 'ромб' }
+        ]
+    },
+    {
+        number: 4, color: '#00CCCC', colorName: 'бирюзовый', colorSoft: 'rgba(0,204,204,0.3)',
+        freq: 417, freqName: 'Transmutation',
+        letters: [
+            { letter: 'В', shape: 'circle', shapeName: 'круг' },
+            { letter: 'К', shape: 'square', shapeName: 'квадрат' },
+            { letter: 'Ф', shape: 'triangle', shapeName: 'треугольник' },
+            { letter: 'Я', shape: 'diamond', shapeName: 'ромб' }
+        ]
+    },
+    {
+        number: 5, color: '#44AAFF', colorName: 'голубой', colorSoft: 'rgba(68,170,255,0.3)',
+        freq: 528, freqName: 'Miracle',
+        letters: [
+            { letter: 'Д', shape: 'circle', shapeName: 'круг' },
+            { letter: 'Л', shape: 'square', shapeName: 'квадрат' },
+            { letter: 'Х', shape: 'triangle', shapeName: 'треугольник' },
+            { letter: 'Ы', shape: 'diamond', shapeName: 'ромб' }
+        ]
+    },
+    {
+        number: 6, color: '#88DD88', colorName: 'светло-зелёный', colorSoft: 'rgba(136,221,136,0.3)',
+        freq: 639, freqName: 'Connection',
+        letters: [
+            { letter: 'Е', shape: 'circle', shapeName: 'круг' },
+            { letter: 'О', shape: 'square', shapeName: 'квадрат' },
+            { letter: 'Ц', shape: 'triangle', shapeName: 'треугольник' },
+            { letter: 'Ь', shape: 'diamond', shapeName: 'ромб' }
+        ]
+    },
+    {
+        number: 7, color: '#AAAAAA', colorName: 'серый', colorSoft: 'rgba(170,170,170,0.3)',
+        freq: 741, freqName: 'Expression',
+        letters: [
+            { letter: 'Ё', shape: 'circle', shapeName: 'круг' },
+            { letter: 'Н', shape: 'square', shapeName: 'квадрат' },
+            { letter: 'Ъ', shape: 'triangle', shapeName: 'треугольник' }
+        ]
+    },
+    {
+        number: 8, color: '#FF66AA', colorName: 'розовый', colorSoft: 'rgba(255,102,170,0.3)',
+        freq: 852, freqName: 'Intuition',
+        letters: [
+            { letter: 'Г', shape: 'circle', shapeName: 'круг' },
+            { letter: 'У', shape: 'square', shapeName: 'квадрат' },
+            { letter: 'Ч', shape: 'triangle', shapeName: 'треугольник' },
+            { letter: 'Щ', shape: 'diamond', shapeName: 'ромб' }
+        ]
+    },
+    {
+        number: 9, color: '#9944FF', colorName: 'фиолетовый', colorSoft: 'rgba(153,68,255,0.3)',
+        freq: 963, freqName: 'Divine',
+        letters: [
+            { letter: 'Ж', shape: 'circle', shapeName: 'круг' },
+            { letter: 'Р', shape: 'square', shapeName: 'квадрат' },
+            { letter: 'Ш', shape: 'triangle', shapeName: 'треугольник' }
+        ]
+    }
+];
+
+// ===================== AUDIO =====================
+let audioCtx, analyser, masterGain;
+let activeOscillators = new Map();
+let droneOscillators = new Map();
+let droneMode = false;
+let isRecording = false, recordingStart = 0, recordedEvents = [];
+let isPlaying = false, playbackTimeouts = [];
+
+function initAudio() {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.4;
+    masterGain.connect(analyser);
+    analyser.connect(audioCtx.destination);
+}
+
+function playTone(freq, stringIdx, btnIdx, isDrone = false) {
+    if (!audioCtx) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const map = isDrone ? droneOscillators : activeOscillators;
+    if (map.has(freq)) return;
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(freq * 3, audioCtx.currentTime);
+
+    const now = audioCtx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.2, now + 0.6);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGain);
+    osc.start();
+
+    map.set(freq, { osc, gain, stringIdx, btnIdx });
+    updateVisualState(freq, true, isDrone);
+    updateHarmonyIndicator(stringIdx, true);
+    createRipple(stringIdx, btnIdx);
+}
+
+function releaseTone(freq, isDrone = false) {
+    const map = isDrone ? droneOscillators : activeOscillators;
+    if (!map.has(freq)) return;
+
+    const { osc, gain } = map.get(freq);
+    const now = audioCtx.currentTime;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+    osc.stop(now + 1.5);
+
+    setTimeout(() => { try { osc.disconnect(); gain.disconnect(); } catch(e) {} }, 1600);
+    map.delete(freq);
+    updateVisualState(freq, false, isDrone);
+    updateAllHarmonyIndicators();
+}
+
+function toggleDroneTone(freq, stringIdx, btnIdx) {
+    if (droneOscillators.has(freq)) {
+        releaseTone(freq, true);
+    } else {
+        playTone(freq, stringIdx, btnIdx, true);
+    }
+}
+
+function toggleDrone() {
+    if (isPlaying) return;
+    droneMode = !droneMode;
+    const btn = document.getElementById('droneBtn');
+    btn.classList.toggle('active', droneMode);
+    btn.textContent = droneMode ? 'Drone: ON' : 'Drone';
+    if (!droneMode) {
+        droneOscillators.forEach((_, freq) => releaseTone(freq, true));
+    }
+}
+
+function stopAll() {
+    activeOscillators.forEach((_, freq) => releaseTone(freq, false));
+    droneOscillators.forEach((_, freq) => releaseTone(freq, true));
+    if (isPlaying) stopPlayback();
+}
+
+function updateVisualState(freq, isActive, isDrone) {
+    document.querySelectorAll('[data-freq="' + freq + '"]').forEach(btn => {
+        btn.classList.toggle('active', isActive);
+        btn.classList.toggle('drone-active', isActive && isDrone);
+    });
+}
+
+function updateHarmonyIndicator(idx, isActive) {
+    const dot = document.getElementById('harmony-' + idx);
+    if (dot) dot.classList.toggle('active', isActive);
+}
+
+function updateAllHarmonyIndicators() {
+    const active = new Set();
+    const check = (map) => {
+        map.forEach((data) => active.add(data.stringIdx));
+    };
+    check(activeOscillators);
+    check(droneOscillators);
+    for (let i = 0; i < 9; i++) updateHarmonyIndicator(i, active.has(i));
+}
+
+function createRipple(stringIdx, btnIdx) {
+    const cols = document.querySelectorAll('.string-column');
+    const col = cols[stringIdx]; if (!col) return;
+    const btns = col.querySelectorAll('.neuro-btn');
+    const btn = btns[btnIdx + 1]; if (!btn) return;
+
+    const rect = btn.getBoundingClientRect();
+    const ripple = document.createElement('div');
+    ripple.style.cssText = 'position:fixed;left:' + (rect.left + rect.width/2) + 'px;top:' + (rect.top + rect.height/2) + 'px;width:0;height:0;border-radius:50%;border:1px solid rgba(255,255,255,0.3);transform:translate(-50%,-50%);pointer-events:none;z-index:100;animation:rippleExpand 1.5s ease-out forwards;';
+    document.body.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 1500);
+}
+
+// ===================== STRING BUILDING =====================
+function createStrings() {
+    const wrapper = document.getElementById('stringsWrapper');
+    const indicator = document.createElement('div');
+    indicator.className = 'fixed top-1/2 right-3 -translate-y-1/2 flex flex-col gap-1.5 z-10 opacity-20';
+    indicator.id = 'harmonyIndicator';
+    document.body.appendChild(indicator);
+
+    neuroData.forEach((data, sIdx) => {
+        const col = document.createElement('div');
+        col.className = 'string-column';
+
+        const line = document.createElement('div');
+        line.className = 'string-line';
+        col.appendChild(line);
+
+        const subBtn = createNeuroBtn(data, sIdx, -1, data.freq / 2, '-1 oct');
+        col.appendChild(subBtn);
+
+        const conn1 = document.createElement('div');
+        conn1.style.cssText = 'width:1px;height:20px;background:linear-gradient(to bottom,rgba(255,255,255,0.08),rgba(255,255,255,0.03));position:relative;';
+        col.appendChild(conn1);
+
+        data.letters.forEach((letterData, bIdx) => {
+            const btn = createNeuroBtn(data, sIdx, bIdx, data.freq, letterData);
+            col.appendChild(btn);
+
+            if (bIdx < data.letters.length - 1) {
+                const conn = document.createElement('div');
+                conn.style.cssText = 'width:1px;height:16px;background:linear-gradient(to bottom,rgba(255,255,255,0.06),rgba(255,255,255,0.02));position:relative;';
+                col.appendChild(conn);
+            }
+        });
+
+        const highBtn = createNeuroBtn(data, sIdx, data.letters.length, data.freq * 2, '+1 oct');
+        col.appendChild(highBtn);
+
+        const label = document.createElement('div');
+        label.className = 'string-label';
+        label.innerHTML = data.freqName + '<div class="string-freq">' + data.freq + 'Hz &middot; ' + data.number + '</div>';
+        col.appendChild(label);
+
+        wrapper.appendChild(col);
+
+        const dot = document.createElement('div');
+        dot.id = 'harmony-' + sIdx;
+        dot.style.cssText = 'width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,0.2);transition:all 0.3s;';
+        indicator.appendChild(dot);
+    });
+}
+
+function createNeuroBtn(data, sIdx, bIdx, freq, letterData) {
+    const isSub = bIdx === -1;
+    const isHigh = typeof letterData === 'string';
+    const btn = document.createElement('div');
+    btn.className = isSub ? 'neuro-btn sub' : 'neuro-btn';
+    btn.dataset.freq = freq;
+    btn.dataset.string = sIdx;
+    btn.dataset.btn = bIdx;
+    btn.style.setProperty('--glow-color', data.color);
+    btn.style.setProperty('--glow-color-soft', data.colorSoft);
+
+    if (isSub || isHigh) {
+        btn.innerHTML = '<div class="text-center"><div class="btn-number" style="font-size:10px">' + Math.round(freq) + '</div><div class="btn-number">Hz</div></div>';
+    } else {
+        const shapeHtml = getShapeHtml(letterData.shape, data.color);
+        btn.innerHTML = '<div class="btn-letter">' + letterData.letter + '</div><div class="btn-shape">' + shapeHtml + '</div><div class="btn-number">' + data.number + '</div>';
+    }
+
+    addBtnListeners(btn, freq, sIdx, bIdx);
+    return btn;
+}
+
+function getShapeHtml(shape, color) {
+    switch(shape) {
+        case 'circle': return '<div class="shape-circle" style="background:' + color + '"></div>';
+        case 'square': return '<div class="shape-square" style="background:' + color + '"></div>';
+        case 'triangle': return '<div style="width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:14px solid ' + color + '"></div>';
+        case 'diamond': return '<div class="shape-diamond" style="background:' + color + '"></div>';
+        default: return '';
+    }
+}
+
+function addBtnListeners(btn, freq, sIdx, bIdx) {
+    const press = (e) => {
+        e.preventDefault();
+        handleBtnPress(freq, sIdx, bIdx, btn);
+    };
+    const release = (e) => {
+        e.preventDefault();
+        handleBtnRelease(freq);
+    };
+
+    btn.addEventListener('mousedown', press);
+    btn.addEventListener('mouseup', release);
+    btn.addEventListener('mouseleave', release);
+    btn.addEventListener('touchstart', press, {passive:false});
+    btn.addEventListener('touchend', release, {passive:false});
+}
+
+function handleBtnPress(freq, sIdx, bIdx, btnElement) {
+    if (isPlaying) return;
+
+    if (currentMode === 'game' && gameActive) {
+        checkGameAnswer(btnElement, sIdx, bIdx);
+    }
+
+    if (droneMode) {
+        toggleDroneTone(freq, sIdx, bIdx);
+    } else {
+        playTone(freq, sIdx, bIdx);
+    }
+
+    if (isRecording) {
+        recordedEvents.push({ type: 'press', time: Date.now() - recordingStart, freq, sIdx, bIdx });
+    }
+
+    document.getElementById('scrollHint').style.opacity = '0';
+}
+
+function handleBtnRelease(freq) {
+    if (isPlaying) return;
+    if (!droneMode) releaseTone(freq);
+    if (isRecording) {
+        recordedEvents.push({ type: 'release', time: Date.now() - recordingStart, freq });
+    }
+}
+
+// ===================== GAME: SEARCH MODE =====================
+let currentMode = 'learn';
+let gameActive = false;
+let currentLevel = 0;
+let gameState = { found: 0, total: 0, errors: 0, maxErrors: 3, timeLeft: 30, timer: null };
+
+const levels = [
+    { type: 'number', target: 1, time: 45, desc: 'Найди все числа 1', sub: 'Красные элементы' },
+    { type: 'number', target: 2, time: 40, desc: 'Найди все числа 2', sub: 'Жёлтые элементы' },
+    { type: 'color', target: 'зелёный', time: 40, desc: 'Найди всё зелёное', sub: 'Числа 3' },
+    { type: 'number', target: 4, time: 35, desc: 'Найди все числа 4', sub: 'Бирюзовые элементы' },
+    { type: 'number', target: 5, time: 35, desc: 'Найди все числа 5', sub: 'Голубые элементы' },
+    { type: 'letter', target: 'Е', time: 35, desc: 'Найди букву Е', sub: 'Светло-зелёный круг' },
+    { type: 'number', target: 7, time: 30, desc: 'Найди все числа 7', sub: 'Серые элементы' },
+    { type: 'color', target: 'розовый', time: 30, desc: 'Найди всё розовое', sub: 'Числа 8' },
+    { type: 'number', target: 9, time: 25, desc: 'Найди все числа 9', sub: 'Фиолетовые элементы' },
+    { type: 'mixed', target: null, time: 25, desc: 'Найди число 3 и 6', sub: 'Зелёные и светло-зелёные' },
+];
+
+function setMode(mode) {
+    currentMode = mode;
+    document.getElementById('modeLearn').classList.toggle('active', mode === 'learn');
+    document.getElementById('modeGame').classList.toggle('active', mode === 'game');
+
+    const panel = document.getElementById('gamePanel');
+    if (mode === 'game') {
+        panel.style.display = 'flex';
+        startLevel(0);
+    } else {
+        panel.style.display = 'none';
+        stopGame();
+    }
+}
+
+function startLevel(lvl) {
+    currentLevel = lvl;
+    const level = levels[lvl];
+    gameActive = true;
+
+    gameState.total = 0;
+    gameState.found = 0;
+    gameState.errors = 0;
+    gameState.timeLeft = level.time;
+
+    document.querySelectorAll('.neuro-btn').forEach(btn => {
+        const sIdx = parseInt(btn.dataset.string);
+        const bIdx = parseInt(btn.dataset.btn);
+        const data = neuroData[sIdx];
+        if (!data || bIdx < 0 || bIdx >= data.letters.length) return;
+
+        let isTarget = false;
+        if (level.type === 'number' && data.number === level.target) isTarget = true;
+        if (level.type === 'color' && data.colorName === level.target) isTarget = true;
+        if (level.type === 'letter' && data.letters[bIdx] && data.letters[bIdx].letter === level.target) isTarget = true;
+        if (level.type === 'mixed') {
+            if (data.number === 3 || data.number === 6) isTarget = true;
+        }
+
+        btn.dataset.target = isTarget ? '1' : '0';
+        btn.dataset.found = '0';
+        btn.classList.remove('found-anim', 'wrong-anim');
+        btn.style.opacity = '1';
+        btn.style.transform = '';
+        if (isTarget) gameState.total++;
+    });
+
+    document.getElementById('missionText').textContent = level.desc;
+    document.getElementById('missionSub').textContent = level.sub;
+    document.getElementById('foundCount').textContent = '0';
+    document.getElementById('totalCount').textContent = gameState.total;
+    document.getElementById('errorCount').textContent = '0';
+    document.getElementById('timeDisplay').textContent = level.time;
+    document.getElementById('progressFill').style.width = '0%';
+
+    const box = document.getElementById('missionBox');
+    box.style.animation = 'none';
+    box.offsetHeight;
+    box.style.animation = 'missionIn 0.4s ease-out';
+
+    clearInterval(gameState.timer);
+    gameState.timer = setInterval(() => {
+        gameState.timeLeft--;
+        document.getElementById('timeDisplay').textContent = gameState.timeLeft;
+        if (gameState.timeLeft <= 0) gameOver(false);
+    }, 1000);
+}
+
+function checkGameAnswer(btn, sIdx, bIdx) {
+    if (btn.dataset.found === '1') return;
+
+    const isTarget = btn.dataset.target === '1';
+
+    if (isTarget) {
+        btn.dataset.found = '1';
+        btn.classList.add('found-anim');
+        btn.style.opacity = '0.3';
+        gameState.found++;
+        document.getElementById('foundCount').textContent = gameState.found;
+        document.getElementById('progressFill').style.width = (gameState.found / gameState.total * 100) + '%';
+
+        if (audioCtx) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+            osc.connect(gain); gain.connect(masterGain);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+        }
+
+        if (gameState.found >= gameState.total) {
+            setTimeout(() => gameOver(true), 600);
+        }
+    } else {
+        btn.classList.add('wrong-anim');
+        setTimeout(() => btn.classList.remove('wrong-anim'), 400);
+        gameState.errors++;
+        document.getElementById('errorCount').textContent = gameState.errors;
+
+        if (audioCtx) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+            osc.connect(gain); gain.connect(masterGain);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+        }
+
+        if (gameState.errors >= gameState.maxErrors) {
+            setTimeout(() => gameOver(false), 300);
+        }
+    }
+}
+
+function gameOver(won) {
+    clearInterval(gameState.timer);
+    gameActive = false;
+
+    if (won) {
+        if (currentLevel >= levels.length - 1) {
+            document.getElementById('completeModal').classList.add('show');
+        } else {
+            document.getElementById('winText').textContent = 'Уровень ' + (currentLevel + 1) + ' пройден! Ошибок: ' + gameState.errors + ', осталось времени: ' + gameState.timeLeft + 'с';
+            document.getElementById('winModal').classList.add('show');
+        }
+    } else {
+        document.getElementById('loseText').textContent = gameState.timeLeft <= 0 ? 'Время вышло! Попробуйте ещё раз.' : 'Слишком много ошибок. Повторите обучение.';
+        document.getElementById('loseModal').classList.add('show');
+    }
+}
+
+function nextLevel() {
+    document.getElementById('winModal').classList.remove('show');
+    startLevel(currentLevel + 1);
+}
+
+function restartLevel() {
+    document.getElementById('loseModal').classList.remove('show');
+    startLevel(currentLevel);
+}
+
+function resetGame() {
+    document.getElementById('completeModal').classList.remove('show');
+    startLevel(0);
+}
+
+function stopGame() {
+    clearInterval(gameState.timer);
+    gameActive = false;
+    document.querySelectorAll('.neuro-btn').forEach(btn => {
+        btn.dataset.target = '0';
+        btn.dataset.found = '0';
+        btn.classList.remove('found-anim', 'wrong-anim');
+        btn.style.opacity = '1';
+    });
+}
+
+// ===================== RECORDING =====================
+function toggleRecording() {
+    if (isPlaying) return;
+    const btn = document.getElementById('recBtn');
+    const playBtn = document.getElementById('playBtn');
+
+    if (!isRecording) {
+        isRecording = true;
+        recordedEvents = [];
+        recordingStart = Date.now();
+        btn.classList.add('recording');
+        btn.textContent = '■ Stop';
+        playBtn.disabled = true;
+        playBtn.classList.remove('has-recording');
+        setTimeout(() => { if (isRecording) toggleRecording(); }, 60000);
+    } else {
+        isRecording = false;
+        btn.classList.remove('recording');
+        btn.textContent = '● Rec';
+        if (recordedEvents.length > 0) {
+            playBtn.disabled = false;
+            playBtn.classList.add('has-recording');
+        }
+    }
+}
+
+function playRecording() {
+    if (isRecording || recordedEvents.length === 0 || isPlaying) return;
+
+    isPlaying = true;
+    const playBtn = document.getElementById('playBtn');
+    playBtn.classList.add('playing');
+    playBtn.textContent = 'Playing...';
+    stopAll();
+
+    recordedEvents.forEach(ev => {
+        const t = setTimeout(() => {
+            if (ev.type === 'press') {
+                playTone(ev.freq, ev.sIdx, ev.bIdx);
+            } else {
+                releaseTone(ev.freq);
+            }
+        }, ev.time);
+        playbackTimeouts.push(t);
+    });
+
+    const last = Math.max(...recordedEvents.map(e => e.time));
+    const endT = setTimeout(() => stopPlayback(), last + 2000);
+    playbackTimeouts.push(endT);
+}
+
+function stopPlayback() {
+    playbackTimeouts.forEach(t => clearTimeout(t));
+    playbackTimeouts = [];
+    stopAll();
+    isPlaying = false;
+    const playBtn = document.getElementById('playBtn');
+    playBtn.classList.remove('playing');
+    playBtn.textContent = '▶ Play';
+}
+
+// ===================== VISUALIZER & PARTICLES =====================
+function animateVisualizer() {
+    requestAnimationFrame(animateVisualizer);
+
+    const canvas = document.getElementById('visualizer');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = 100;
+
+    if (!analyser) return;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteFrequencyData(dataArray);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const barWidth = canvas.width / bufferLength * 2.5;
+    let x = 0;
+
+    for (let i = 0; i < bufferLength; i++) {
+        const barHeight = dataArray[i] / 2.5;
+        const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight);
+        gradient.addColorStop(0, 'rgba(255,255,255,0.06)');
+        gradient.addColorStop(1, 'rgba(255,255,255,0.2)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        x += barWidth + 1;
+    }
+}
+
+function createParticles() {
+    for (let i = 0; i < 15; i++) {
+        setTimeout(() => {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.left = Math.random() * 100 + 'vw';
+            p.style.top = '100vh';
+            p.style.animationDelay = Math.random() * 8 + 's';
+            p.style.animationDuration = (12 + Math.random() * 10) + 's';
+            document.body.appendChild(p);
+        }, i * 400);
+    }
+}
+
+// ===================== SCROLL =====================
+function scrollToStart() {
+    document.getElementById('scrollContainer').scrollTo({ left: 0, behavior: 'smooth' });
+}
+function scrollToEnd() {
+    const c = document.getElementById('scrollContainer');
+    c.scrollTo({ left: c.scrollWidth, behavior: 'smooth' });
+}
+
+// ===================== INIT =====================
+function initApp() {
+    initAudio();
+    document.getElementById('startOverlay').classList.add('hidden');
+    createStrings();
+    createParticles();
+    animateVisualizer();
+    setMode('learn');
+
+    setTimeout(() => {
+        const c = document.getElementById('scrollContainer');
+        c.scrollLeft = (c.scrollWidth - c.clientWidth) / 2;
+    }, 100);
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === ' ') stopAll();
+});
+
+const style = document.createElement('style');
+style.textContent = '@keyframes rippleExpand { 0%{width:0;height:0;opacity:1;} 100%{width:200px;height:200px;opacity:0;} }';
+document.head.appendChild(style);
+
+window.addEventListener('resize', () => {
+    document.getElementById('visualizer').width = window.innerWidth;
+});
+</script>
+</body>
+</html>
