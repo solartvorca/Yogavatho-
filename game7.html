@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Нейрогенез — Ритм (Simon Says)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Cormorant+Garamond:wght@300;400;600&display=swap');
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a12;
+            overflow: hidden;
+            margin: 0; padding: 0;
+            color: white;
+            user-select: none;
+        }
+
+        .serif { font-family: 'Cormorant Garamond', serif; }
+
+        .start-overlay {
+            position: fixed; inset: 0; background: #0a0a12; z-index: 100;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.8s ease;
+        }
+        .start-overlay.hidden { opacity: 0; pointer-events: none; }
+        .start-btn {
+            padding: 18px 50px; border: 1px solid rgba(255,255,255,0.2); background: transparent;
+            color: white; font-size: 13px; letter-spacing: 4px; text-transform: uppercase;
+            cursor: pointer; transition: all 0.4s ease; border-radius: 4px;
+        }
+        .start-btn:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.4); letter-spacing: 6px; }
+
+        .top-bar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+            background: rgba(10,10,18,0.9); backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .game-container {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+            padding: 20px; z-index: 10;
+        }
+
+        .cell {
+            width: 100px; height: 100px; border-radius: 16px;
+            border: 1.5px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(8px);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 4px;
+        }
+
+        .cell::before {
+            content: ''; position: absolute; inset: 0; border-radius: 16px;
+            padding: 1.5px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent 60%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude;
+            opacity: 0.3;
+        }
+
+        .cell:hover { transform: scale(1.05); border-color: rgba(255,255,255,0.25); }
+
+        .cell.active {
+            transform: scale(1.12);
+            box-shadow: 0 0 50px var(--glow-color), inset 0 0 30px var(--glow-color-soft);
+            border-color: var(--glow-color);
+            background: radial-gradient(circle at 50% 50%, var(--glow-color-soft), rgba(255,255,255,0.05));
+        }
+
+        .cell.active::after {
+            content: ''; position: absolute; inset: -4px; border-radius: 20px;
+            border: 2px solid var(--glow-color); opacity: 0.5;
+            animation: cellRipple 1s ease-out infinite;
+        }
+
+        .cell.correct { animation: correctFlash 0.4s ease-out; }
+        .cell.wrong {
+            animation: wrongShake 0.4s ease-in-out;
+            border-color: #ff4444 !important;
+            box-shadow: 0 0 30px rgba(255,68,68,0.3) !important;
+        }
+        .cell.blocked { pointer-events: none; opacity: 0.6; }
+        .cell.dimmed { opacity: 0.3; }
+
+        @keyframes cellRipple {
+            0% { transform: scale(1); opacity: 0.5; }
+            100% { transform: scale(1.15); opacity: 0; }
+        }
+        @keyframes correctFlash {
+            0% { transform: scale(1.12); filter: brightness(1); }
+            50% { transform: scale(1.2); filter: brightness(1.8); }
+            100% { transform: scale(1.12); filter: brightness(1); }
+        }
+        @keyframes wrongShake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-4px); }
+            80% { transform: translateX(4px); }
+        }
+
+        .cell-letters { font-size: 9px; letter-spacing: 1px; color: rgba(255,255,255,0.5); text-transform: uppercase; }
+        .cell-number { font-size: 28px; font-weight: 300; color: rgba(255,255,255,0.9); line-height: 1; }
+        .cell-shapes { display: flex; gap: 3px; align-items: center; }
+        .cell-shape { width: 10px; height: 10px; }
+        .cell-shape.circle { border-radius: 50%; }
+        .cell-shape.square { border-radius: 2px; }
+        .cell-shape.triangle { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid currentColor; }
+        .cell-shape.diamond { width: 8px; height: 8px; transform: rotate(45deg); border-radius: 1px; }
+
+        .status-panel {
+            position: fixed; top: 55px; left: 50%; transform: translateX(-50%);
+            z-index: 25; display: flex; flex-direction: column; align-items: center;
+            gap: 8px; pointer-events: none;
+        }
+
+        .round-badge {
+            background: rgba(255,255,255,0.06); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;
+            padding: 8px 24px; text-align: center;
+        }
+        .round-text { font-size: 12px; letter-spacing: 2px; color: rgba(255,255,255,0.7); }
+        .round-sub { font-size: 10px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+
+        .sequence-preview { display: flex; gap: 6px; align-items: center; justify-content: center; min-height: 36px; }
+        .seq-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.15); transition: all 0.3s ease; }
+        .seq-dot.filled { background: rgba(255,255,255,0.6); box-shadow: 0 0 8px rgba(255,255,255,0.3); }
+        .seq-dot.current { background: rgba(255,255,255,0.9); box-shadow: 0 0 12px rgba(255,255,255,0.5); transform: scale(1.3); }
+
+        .score-display { font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 2px; }
+        .score-display b { color: rgba(255,255,255,0.7); }
+
+        .controls-bar {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+            background: rgba(10,10,18,0.9); backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            display: flex; justify-content: center; align-items: center;
+            gap: 8px; padding: 12px 16px; flex-wrap: wrap;
+        }
+
+        .ctrl-btn {
+            padding: 8px 18px; border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.5);
+            font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+            cursor: pointer; transition: all 0.3s ease; border-radius: 20px; white-space: nowrap;
+        }
+        .ctrl-btn:hover { border-color: rgba(255,255,255,0.25); color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.05); }
+        .ctrl-btn.active { border-color: rgba(255,255,255,0.4); color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.1); }
+        .ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 60;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.show { opacity: 1; pointer-events: all; }
+        .modal-box {
+            background: rgba(15,15,25,0.95); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+            padding: 32px 36px; max-width: 380px; width: 90%; text-align: center;
+            transform: scale(0.9); transition: transform 0.3s ease;
+        }
+        .modal-overlay.show .modal-box { transform: scale(1); }
+        .modal-title { font-size: 20px; letter-spacing: 2px; margin-bottom: 16px; }
+        .modal-text { font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.7; margin-bottom: 24px; }
+        .modal-btn {
+            padding: 12px 32px; border: 1px solid rgba(255,255,255,0.2); background: transparent;
+            color: white; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+            cursor: pointer; border-radius: 4px; transition: all 0.3s ease; margin: 0 4px;
+        }
+        .modal-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.4); }
+        .modal-btn.primary { border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.08); }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; text-align: left; }
+        .stat-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px 14px; }
+        .stat-label { font-size: 9px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 18px; color: rgba(255,255,255,0.8); margin-top: 4px; font-weight: 300; }
+
+        .diff-selector { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
+        .diff-btn {
+            padding: 6px 14px; border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.4);
+            font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+            cursor: pointer; border-radius: 12px; transition: all 0.3s;
+        }
+        .diff-btn:hover { border-color: rgba(255,255,255,0.25); color: rgba(255,255,255,0.7); }
+        .diff-btn.selected { border-color: rgba(255,255,255,0.4); color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.08); }
+
+        .screen-flash { position: fixed; inset: 0; pointer-events: none; z-index: 55; background: transparent; transition: background 0.1s; }
+        .screen-flash.red { background: rgba(255,50,50,0.15); }
+        .screen-flash.white { background: rgba(255,255,255,0.1); }
+
+        .particle { position: fixed; width: 2px; height: 2px; border-radius: 50%; background: rgba(255,255,255,0.4); pointer-events: none; z-index: 1; animation: floatUp 15s infinite ease-in-out; }
+        @keyframes floatUp {
+            0%,100% { transform: translateY(0) translateX(0); opacity: 0; }
+            10% { opacity: 0.7; }
+            90% { opacity: 0.4; }
+            100% { transform: translateY(-100vh) translateX(40px); opacity: 0; }
+        }
+
+        .mode-selector { position: fixed; top: 50px; right: 16px; z-index: 25; display: flex; flex-direction: column; gap: 6px; }
+        .mode-btn {
+            padding: 6px 12px; border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.4);
+            font-size: 8px; letter-spacing: 1px; text-transform: uppercase;
+            cursor: pointer; border-radius: 10px; transition: all 0.3s; text-align: right;
+        }
+        .mode-btn:hover { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.7); }
+        .mode-btn.active { border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.06); }
+
+        @media (max-width: 768px) {
+            .cell { width: 80px; height: 80px; border-radius: 12px; }
+            .cell-number { font-size: 22px; }
+            .cell-letters { font-size: 7px; }
+            .cell-shape { width: 8px; height: 8px; }
+            .game-container { gap: 8px; padding: 12px; }
+            .modal-box { padding: 24px 20px; }
+            .modal-title { font-size: 16px; }
+            .stats-grid { gap: 8px; }
+            .mode-selector { top: 45px; right: 8px; }
+            .mode-btn { padding: 4px 8px; font-size: 7px; }
+        }
+        @media (max-width: 360px) {
+            .cell { width: 70px; height: 70px; }
+            .cell-number { font-size: 18px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="start-overlay" id="startOverlay">
+    <div class="text-center mb-8">
+        <h2 class="serif text-3xl text-white/80 mb-2 tracking-[0.2em]">Нейрогенез</h2>
+        <p class="text-white/30 text-xs tracking-[0.3em] uppercase mb-1">Ритм</p>
+        <p class="text-white/20 text-[10px] tracking-wider">Simon Says × Solfeggio</p>
+    </div>
+    <div class="diff-selector mb-8">
+        <button class="diff-btn selected" data-diff="1" onclick="selectDiff(1)">Медитация</button>
+        <button class="diff-btn" data-diff="2" onclick="selectDiff(2)">Обучение</button>
+        <button class="diff-btn" data-diff="3" onclick="selectDiff(3)">Тренировка</button>
+        <button class="diff-btn" data-diff="4" onclick="selectDiff(4)">Экзамен</button>
+        <button class="diff-btn" data-diff="5" onclick="selectDiff(5)">Мастер</button>
+    </div>
+    <button class="start-btn" onclick="initApp()">Начать игру</button>
+    <p class="text-white/15 text-[9px] mt-6 tracking-wider">Нажмите для активации аудио</p>
+</div>
+
+<div class="screen-flash" id="screenFlash"></div>
+
+<div class="top-bar">
+    <div class="flex items-center justify-between px-4 py-3">
+        <div class="flex items-center gap-2">
+            <span class="serif text-sm text-white/60 tracking-wider">Нейрогенез</span>
+            <span class="text-white/20 text-[9px]">×</span>
+            <span class="text-white/30 text-[9px] tracking-wider">Ритм</span>
+        </div>
+        <div class="score-display">
+            Раунд: <b id="topRound">0</b> | Очки: <b id="topScore">0</b> | Рекорд: <b id="topRecord">0</b>
+        </div>
+    </div>
+</div>
+
+<div class="mode-selector" id="modeSelector" style="display:none;">
+    <button class="mode-btn active" data-mode="classic" onclick="setGameMode('classic')">Классика</button>
+    <button class="mode-btn" data-mode="words" onclick="setGameMode('words')">Слова</button>
+    <button class="mode-btn" data-mode="colors" onclick="setGameMode('colors')">Цвета</button>
+    <button class="mode-btn" data-mode="blind" onclick="setGameMode('blind')">Слепой</button>
+</div>
+
+<div class="status-panel" id="statusPanel">
+    <div class="round-badge" id="roundBadge">
+        <div class="round-text" id="roundText">Нажмите СТАРТ</div>
+        <div class="round-sub" id="roundSub">Запомни последовательность</div>
+    </div>
+    <div class="sequence-preview" id="sequencePreview"></div>
+</div>
+
+<div class="game-container" id="gameGrid"></div>
+
+<div class="controls-bar">
+    <button class="ctrl-btn primary" id="startGameBtn" onclick="startGame()">▶ Старт</button>
+    <button class="ctrl-btn" onclick="stopGame()">■ Стоп</button>
+    <button class="ctrl-btn" id="droneBtn" onclick="toggleDrone()">Drone</button>
+    <button class="ctrl-btn" onclick="showStats()">Статистика</button>
+</div>
+
+<div class="modal-overlay" id="gameOverModal">
+    <div class="modal-box">
+        <div class="modal-title serif" id="goTitle" style="color:#ff8888">Игра окончена</div>
+        <div class="modal-text" id="goText"></div>
+        <div class="stats-grid" id="goStats"></div>
+        <div>
+            <button class="modal-btn primary" onclick="restartGame()">Повторить</button>
+            <button class="modal-btn" onclick="backToMenu()">Меню</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="statsModal">
+    <div class="modal-box">
+        <div class="modal-title serif">Статистика</div>
+        <div class="stats-grid" id="statsGrid"></div>
+        <div class="modal-text" style="font-size:11px; margin-top:8px;" id="statsWeak"></div>
+        <button class="modal-btn" onclick="closeStats()">Закрыть</button>
+    </div>
+</div>
+
+<div id="achievementToast" style="position:fixed;top:100px;left:50%;transform:translateX(-50%) translateY(-20px);z-index:70;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:10px 24px;opacity:0;transition:all 0.5s ease;pointer-events:none;text-align:center;">
+    <div style="font-size:10px;color:rgba(255,255,255,0.5);letter-spacing:2px;text-transform:uppercase;">Достижение</div>
+    <div style="font-size:14px;color:rgba(255,255,255,0.9);margin-top:2px;" id="achText"></div>
+</div>
+
+<script>
+const neuroData = [
+    { number: 1, color: '#FF4444', colorName: 'красный', colorSoft: 'rgba(255,68,68,0.3)', freq: 174, freqName: 'Foundation', letters: ['И','С','Э'], shapes: ['circle','square','triangle'] },
+    { number: 2, color: '#FFCC00', colorName: 'жёлтый', colorSoft: 'rgba(255,204,0,0.3)', freq: 285, freqName: 'Quantum', letters: ['А','Й','П','Т'], shapes: ['circle','square','triangle','diamond'] },
+    { number: 3, color: '#44DD44', colorName: 'зелёный', colorSoft: 'rgba(68,221,68,0.3)', freq: 369, freqName: 'Universe', letters: ['Б','З','М','Ю'], shapes: ['circle','square','triangle','diamond'] },
+    { number: 4, color: '#00CCCC', colorName: 'бирюзовый', colorSoft: 'rgba(0,204,204,0.3)', freq: 417, freqName: 'Transmutation', letters: ['В','К','Ф','Я'], shapes: ['circle','square','triangle','diamond'] },
+    { number: 5, color: '#44AAFF', colorName: 'голубой', colorSoft: 'rgba(68,170,255,0.3)', freq: 528, freqName: 'Miracle', letters: ['Д','Л','Х','Ы'], shapes: ['circle','square','triangle','diamond'] },
+    { number: 6, color: '#88DD88', colorName: 'светло-зелёный', colorSoft: 'rgba(136,221,136,0.3)', freq: 639, freqName: 'Connection', letters: ['Е','О','Ц','Ь'], shapes: ['circle','square','triangle','diamond'] },
+    { number: 7, color: '#AAAAAA', colorName: 'серый', colorSoft: 'rgba(170,170,170,0.3)', freq: 741, freqName: 'Expression', letters: ['Ё','Н','Ъ'], shapes: ['circle','square','triangle'] },
+    { number: 8, color: '#FF66AA', colorName: 'розовый', colorSoft: 'rgba(255,102,170,0.3)', freq: 852, freqName: 'Intuition', letters: ['Г','У','Ч','Щ'], shapes: ['circle','square','triangle','diamond'] },
+    { number: 9, color: '#9944FF', colorName: 'фиолетовый', colorSoft: 'rgba(153,68,255,0.3)', freq: 963, freqName: 'Divine', letters: ['Ж','Р','Ш'], shapes: ['circle','square','triangle'] }
+];
+
+const difficulties = {
+    1: { name: 'Медитация', interval: 1200, label: 'Медленно, с подсказками' },
+    2: { name: 'Обучение', interval: 800, label: 'Стандартный режим' },
+    3: { name: 'Тренировка', interval: 600, label: 'Без подсказок, двойные с 5 раунда' },
+    4: { name: 'Экзамен', interval: 400, label: 'Быстро, 1 жизнь' },
+    5: { name: 'Мастер', interval: 300, label: 'Максимальная скорость' }
+};
+
+const achievements = [
+    { id: 'novice', name: 'Новичок', rounds: 3 },
+    { id: 'student', name: 'Студент', rounds: 7 },
+    { id: 'master', name: 'Магистр', rounds: 12 },
+    { id: 'guru', name: 'Гуру', rounds: 20 },
+    { id: 'synesthete', name: 'Синестетик', rounds: 10, perfect: true },
+    { id: 'mnemonist', name: 'Мнемонист', rounds: 15 }
+];
+
+// ===== AUDIO =====
+let audioCtx, masterGain;
+let droneMode = false, droneOsc = null;
+
+function initAudio() {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.3;
+    masterGain.connect(audioCtx.destination);
+}
+
+function playTone(freq, duration = 0.5) {
+    if (!audioCtx) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(freq * 4, audioCtx.currentTime);
+    const now = audioCtx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.25, now + 0.1);
+    gain.gain.setValueAtTime(0.25, now + duration - 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    osc.connect(filter); filter.connect(gain); gain.connect(masterGain);
+    osc.start(now); osc.stop(now + duration);
+}
+
+function playCorrectSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+    osc.connect(gain); gain.connect(masterGain); osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+}
+
+function playErrorSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+    osc.connect(gain); gain.connect(masterGain); osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+}
+
+function playRoundCompleteSound() {
+    if (!audioCtx) return;
+    [528, 639, 852].forEach((f, i) => {
+        const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(f, audioCtx.currentTime + i * 0.15);
+        gain.gain.setValueAtTime(0, audioCtx.currentTime + i * 0.15);
+        gain.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + i * 0.15 + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.15 + 0.4);
+        osc.connect(gain); gain.connect(masterGain);
+        osc.start(audioCtx.currentTime + i * 0.15); osc.stop(audioCtx.currentTime + i * 0.15 + 0.4);
+    });
+}
+
+function toggleDrone() {
+    droneMode = !droneMode;
+    const btn = document.getElementById('droneBtn');
+    btn.classList.toggle('active', droneMode);
+    btn.textContent = droneMode ? 'Drone: ON' : 'Drone';
+    if (droneMode && audioCtx) {
+        droneOsc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        droneOsc.type = 'sine'; droneOsc.frequency.setValueAtTime(174, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        droneOsc.connect(gain); gain.connect(masterGain); droneOsc.start();
+    } else if (droneOsc) {
+        droneOsc.stop(); droneOsc = null;
+    }
+}
+
+// ===== STATE =====
+let selectedDiff = 1, gameMode = 'classic', gameActive = false;
+let sequence = [], playerIndex = 0, round = 0, score = 0, lives = 3;
+let perfectStreak = 0, isShowingSequence = false;
+let errorStats = {}, sessionStats = { rounds: 0, maxSequence: 0, totalClicks: 0, errors: 0 };
+let unlockedAchievements = new Set(JSON.parse(localStorage.getItem('neuro_ach') || '[]'));
+let highScore = parseInt(localStorage.getItem('neuro_high') || '0');
+let highRound = parseInt(localStorage.getItem('neuro_round') || '0');
+let demoTimers = [];
+
+// ===== UI =====
+function createGrid() {
+    const grid = document.getElementById('gameGrid');
+    grid.innerHTML = '';
+    neuroData.forEach((data, idx) => {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.index = idx;
+        cell.style.setProperty('--glow-color', data.color);
+        cell.style.setProperty('--glow-color-soft', data.colorSoft);
+
+        const shapesHtml = data.shapes.map(s => {
+            if (s === 'circle') return '<div class="cell-shape circle" style="background:' + data.color + '"></div>';
+            if (s === 'square') return '<div class="cell-shape square" style="background:' + data.color + '"></div>';
+            if (s === 'triangle') return '<div class="cell-shape triangle" style="color:' + data.color + '"></div>';
+            if (s === 'diamond') return '<div class="cell-shape diamond" style="background:' + data.color + '"></div>';
+            return '';
+        }).join('');
+
+        cell.innerHTML =
+            '<div class="cell-letters">' + data.letters.join(' ') + '</div>' +
+            '<div class="cell-number">' + data.number + '</div>' +
+            '<div class="cell-shapes">' + shapesHtml + '</div>';
+
+        cell.addEventListener('click', () => handleCellClick(idx));
+        cell.addEventListener('touchstart', e => { e.preventDefault(); handleCellClick(idx); }, {passive:false});
+        grid.appendChild(cell);
+    });
+}
+
+function selectDiff(diff) {
+    selectedDiff = diff;
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.toggle('selected', parseInt(b.dataset.diff) === diff));
+}
+
+function setGameMode(mode) {
+    gameMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    if (gameActive) restartGame();
+}
+
+// ===== GAME =====
+function startGame() {
+    if (!audioCtx) initAudio();
+    gameActive = true;
+    sequence = []; playerIndex = 0; round = 0; score = 0;
+    lives = selectedDiff === 4 ? 1 : 3;
+    perfectStreak = 0;
+    sessionStats = { rounds: 0, maxSequence: 0, totalClicks: 0, errors: 0 };
+    errorStats = {};
+    document.getElementById('startGameBtn').textContent = 'Игра...';
+    document.getElementById('startGameBtn').disabled = true;
+    document.getElementById('modeSelector').style.display = 'flex';
+    updateTopBar();
+    nextRound();
+}
+
+function stopGame() {
+    gameActive = false; isShowingSequence = false;
+    clearAllTimers();
+    document.getElementById('startGameBtn').textContent = '▶ Старт';
+    document.getElementById('startGameBtn').disabled = false;
+    document.getElementById('modeSelector').style.display = 'none';
+    setStatus('Нажмите СТАРТ', 'Запомни последовательность');
+    document.getElementById('sequencePreview').innerHTML = '';
+    unblockCells();
+}
+
+function clearAllTimers() {
+    demoTimers.forEach(t => clearTimeout(t));
+    demoTimers = [];
+}
+
+function nextRound() {
+    if (!gameActive) return;
+    round++; playerIndex = 0; sessionStats.rounds = round;
+
+    const candidates = sequence.length > 0
+        ? neuroData.map((d, i) => i).filter(i => i !== sequence[sequence.length - 1])
+        : neuroData.map((d, i) => i);
+    const newIdx = candidates[Math.floor(Math.random() * candidates.length)];
+
+    if (selectedDiff >= 3 && round > 5 && Math.random() < 0.3) sequence.push(newIdx);
+    sequence.push(newIdx);
+
+    if (sequence.length > sessionStats.maxSequence) sessionStats.maxSequence = sequence.length;
+
+    updateTopBar();
+    setStatus('Раунд ' + round, 'Запомни последовательность...');
+    updateSequencePreview();
+    blockCells();
+
+    if (gameMode === 'blind') document.getElementById('gameGrid').classList.add('dimmed');
+
+    isShowingSequence = true;
+    const interval = difficulties[selectedDiff].interval;
+    let delay = 600;
+
+    sequence.forEach((idx, i) => {
+        const t = setTimeout(() => {
+            if (!gameActive) return;
+            activateCell(idx, interval);
+            highlightPreviewDot(i);
+        }, delay);
+        demoTimers.push(t);
+        delay += interval + 200;
+    });
+
+    const endT = setTimeout(() => {
+        if (!gameActive) return;
+        isShowingSequence = false;
+        document.getElementById('gameGrid').classList.remove('dimmed');
+        setStatus('Ваш ход!', 'Повтори последовательность');
+        unblockCells();
+        updateSequencePreviewPlayer();
+    }, delay + 300);
+    demoTimers.push(endT);
+}
+
+function activateCell(idx, duration = 500) {
+    const cell = document.querySelectorAll('.cell')[idx];
+    if (!cell) return;
+    cell.classList.add('active');
+    playTone(neuroData[idx].freq, duration / 1000);
+    if (navigator.vibrate) navigator.vibrate(50);
+    setTimeout(() => cell.classList.remove('active'), duration);
+}
+
+function handleCellClick(idx) {
+    if (!gameActive || isShowingSequence) return;
+    sessionStats.totalClicks++;
+    const expectedIdx = sequence[playerIndex];
+
+    if (idx === expectedIdx) {
+        const cell = document.querySelectorAll('.cell')[idx];
+        cell.classList.add('correct');
+        setTimeout(() => cell.classList.remove('correct'), 400);
+        playCorrectSound();
+        if (navigator.vibrate) navigator.vibrate(30);
+        playerIndex++;
+        score += round * 10 + (selectedDiff >= 4 ? 5 : 0);
+        updateSequencePreviewPlayer();
+
+        if (playerIndex >= sequence.length) {
+            perfectStreak++;
+            playRoundCompleteSound();
+            checkAchievements();
+            if (perfectStreak >= 5) score = Math.floor(score * 1.5);
+            if (perfectStreak >= 10) score = Math.floor(score * 2);
+            updateTopBar();
+            blockCells();
+            demoTimers.push(setTimeout(() => nextRound(), 1000));
+        }
+    } else {
+        const cell = document.querySelectorAll('.cell')[idx];
+        cell.classList.add('wrong');
+        setTimeout(() => cell.classList.remove('wrong'), 400);
+        playErrorSound();
+        flashScreen('red');
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        perfectStreak = 0; lives--; sessionStats.errors++;
+
+        const key = neuroData[expectedIdx].number + '-' + neuroData[expectedIdx].letters[0];
+        errorStats[key] = (errorStats[key] || 0) + 1;
+        updateTopBar();
+
+        if (lives <= 0) {
+            endGame(false);
+        } else {
+            setStatus('Ошибка! Жизней: ' + lives, 'Правильный элемент подсвечен');
+            demoTimers.push(setTimeout(() => {
+                if (gameActive) activateCell(expectedIdx, 800);
+            }, 800));
+        }
+    }
+}
+
+function endGame() {
+    gameActive = false; isShowingSequence = false;
+    clearAllTimers();
+    document.getElementById('gameGrid').classList.remove('dimmed');
+
+    if (score > highScore) { highScore = score; localStorage.setItem('neuro_high', highScore); }
+    if (round > highRound) { highRound = round; localStorage.setItem('neuro_round', highRound); }
+    updateTopBar();
+
+    const seqStr = sequence.map(i => neuroData[i].letters[0]).join('-');
+    document.getElementById('goTitle').textContent = 'Игра окончена';
+    document.getElementById('goTitle').style.color = '#ff8888';
+    document.getElementById('goText').innerHTML =
+        'Последовательность: <b>' + seqStr + '</b><br>' +
+        'Раундов: ' + round + ' | Макс. длина: ' + sessionStats.maxSequence + '<br>' +
+        'Очки: ' + score + ' | Ошибок: ' + sessionStats.errors;
+
+    const acc = sessionStats.totalClicks > 0
+        ? Math.round((sessionStats.totalClicks - sessionStats.errors) / sessionStats.totalClicks * 100) : 0;
+
+    document.getElementById('goStats').innerHTML =
+        '<div class="stat-item"><div class="stat-label">Рекорд раундов</div><div class="stat-value">' + highRound + '</div></div>' +
+        '<div class="stat-item"><div class="stat-label">Рекорд очков</div><div class="stat-value">' + highScore + '</div></div>' +
+        '<div class="stat-item"><div class="stat-label">Серия без ошибок</div><div class="stat-value">' + perfectStreak + '</div></div>' +
+        '<div class="stat-item"><div class="stat-label">Точность</div><div class="stat-value">' + acc + '%</div></div>';
+
+    document.getElementById('gameOverModal').classList.add('show');
+    document.getElementById('startGameBtn').textContent = '▶ Старт';
+    document.getElementById('startGameBtn').disabled = false;
+}
+
+function restartGame() { document.getElementById('gameOverModal').classList.remove('show'); startGame(); }
+function backToMenu() { document.getElementById('gameOverModal').classList.remove('show'); stopGame(); }
+
+// ===== UI HELPERS =====
+function setStatus(text, sub) {
+    document.getElementById('roundText').textContent = text;
+    document.getElementById('roundSub').textContent = sub;
+}
+function updateTopBar() {
+    document.getElementById('topRound').textContent = round;
+    document.getElementById('topScore').textContent = score;
+    document.getElementById('topRecord').textContent = highRound;
+}
+function updateSequencePreview() {
+    const preview = document.getElementById('sequencePreview');
+    preview.innerHTML = '';
+    sequence.forEach(() => {
+        const dot = document.createElement('div');
+        dot.className = 'seq-dot';
+        preview.appendChild(dot);
+    });
+}
+function updateSequencePreviewPlayer() {
+    document.querySelectorAll('.seq-dot').forEach((d, i) => {
+        d.classList.toggle('filled', i < playerIndex);
+        d.classList.toggle('current', i === playerIndex);
+    });
+}
+function highlightPreviewDot(idx) {
+    document.querySelectorAll('.seq-dot').forEach((d, i) => d.classList.toggle('current', i === idx));
+}
+function blockCells() { document.querySelectorAll('.cell').forEach(c => c.classList.add('blocked')); }
+function unblockCells() { document.querySelectorAll('.cell').forEach(c => c.classList.remove('blocked')); }
+function flashScreen(color) {
+    const f = document.getElementById('screenFlash');
+    f.className = 'screen-flash ' + color;
+    setTimeout(() => f.className = 'screen-flash', 200);
+}
+
+// ===== ACHIEVEMENTS =====
+function checkAchievements() {
+    achievements.forEach(ach => {
+        if (unlockedAchievements.has(ach.id)) return;
+        let ok = round >= ach.rounds;
+        if (ach.perfect) ok = ok && perfectStreak >= ach.rounds;
+        if (ok) {
+            unlockedAchievements.add(ach.id);
+            localStorage.setItem('neuro_ach', JSON.stringify([...unlockedAchievements]));
+            showAchievement(ach.name);
+        }
+    });
+}
+function showAchievement(name) {
+    const toast = document.getElementById('achievementToast');
+    document.getElementById('achText').textContent = name;
+    toast.style.opacity = '1'; toast.style.transform = 'translateX(-50%) translateY(0)';
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(-50%) translateY(-20px)'; }, 3000);
+}
+
+// ===== STATS =====
+function showStats() {
+    const acc = sessionStats.totalClicks > 0
+        ? Math.round((sessionStats.totalClicks - sessionStats.errors) / sessionStats.totalClicks * 100) : 0;
+
+    document.getElementById('statsGrid').innerHTML =
+        '<div class="stat-item"><div class="stat-label">Рекорд раундов</div><div class="stat-value">' + highRound + '</div></div>' +
+        '<div class="stat-item"><div class="stat-label">Рекорд очков</div><div class="stat-value">' + highScore + '</div></div>' +
+        '<div class="stat-item"><div class="stat-label">Достижений</div><div class="stat-value">' + unlockedAchievements.size + '/' + achievements.length + '</div></div>' +
+        '<div class="stat-item"><div class="stat-label">Точность сессии</div><div class="stat-value">' + acc + '%</div></div>';
+
+    let weakest = null, maxErr = 0;
+    for (const [key, count] of Object.entries(errorStats)) {
+        if (count > maxErr) { maxErr = count; weakest = key; }
+    }
+    document.getElementById('statsWeak').textContent = weakest
+        ? 'Слабое место: число ' + weakest.split('-')[0] + ' (буква ' + weakest.split('-')[1] + ') — ' + maxErr + ' ошибок'
+        : 'Пока нет данных об ошибках';
+
+    document.getElementById('statsModal').classList.add('show');
+}
+function closeStats() { document.getElementById('statsModal').classList.remove('show'); }
+
+// ===== INIT =====
+function initApp() {
+    initAudio();
+    document.getElementById('startOverlay').classList.add('hidden');
+    createGrid();
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === ' ' && gameActive && !isShowingSequence && playerIndex === 0 && sequence.length > 0) {
+        sequence.forEach((idx, i) => setTimeout(() => activateCell(idx, 400), i * 600));
+    }
+});
+
+for (let i = 0; i < 12; i++) {
+    setTimeout(() => {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.left = Math.random() * 100 + 'vw';
+        p.style.top = '100vh';
+        p.style.animationDelay = Math.random() * 10 + 's';
+        p.style.animationDuration = (15 + Math.random() * 12) + 's';
+        document.body.appendChild(p);
+    }, i * 500);
+}
+</script>
+</body>
+</html>
