@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Нейрогенез: Дельфин</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            background: #0d0d1a;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #gameCanvas {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const NEURO_TABLE = [
+            { letter: 'И', digit: 1, shape: 'circle',   color: '#FF6B6B', colorName: 'красный',     bg: 'volcano' },
+            { letter: 'С', digit: 1, shape: 'rounded',  color: '#FF6B6B', colorName: 'красный',     bg: 'volcano' },
+            { letter: 'Э', digit: 1, shape: 'triangle', color: '#FF6B6B', colorName: 'красный',     bg: 'volcano' },
+            { letter: 'А', digit: 2, shape: 'circle',   color: '#FFD93D', colorName: 'жёлтый',      bg: 'desert'  },
+            { letter: 'Й', digit: 2, shape: 'rounded',  color: '#FFD93D', colorName: 'жёлтый',      bg: 'desert'  },
+            { letter: 'П', digit: 2, shape: 'triangle', color: '#FFD93D', colorName: 'жёлтый',      bg: 'desert'  },
+            { letter: 'Т', digit: 2, shape: 'diamond',  color: '#FFD93D', colorName: 'жёлтый',      bg: 'desert'  },
+            { letter: 'Б', digit: 3, shape: 'circle',   color: '#6BCB77', colorName: 'зелёный',     bg: 'forest'  },
+            { letter: 'З', digit: 3, shape: 'rounded',  color: '#6BCB77', colorName: 'зелёный',     bg: 'forest'  },
+            { letter: 'М', digit: 3, shape: 'triangle', color: '#6BCB77', colorName: 'зелёный',     bg: 'forest'  },
+            { letter: 'Ю', digit: 3, shape: 'diamond',  color: '#6BCB77', colorName: 'зелёный',     bg: 'forest'  },
+            { letter: 'В', digit: 4, shape: 'circle',   color: '#4D96FF', colorName: 'синий',       bg: 'ocean'   },
+            { letter: 'К', digit: 4, shape: 'rounded',  color: '#4D96FF', colorName: 'синий',       bg: 'ocean'   },
+            { letter: 'Ф', digit: 4, shape: 'triangle', color: '#4D96FF', colorName: 'синий',       bg: 'ocean'   },
+            { letter: 'Я', digit: 4, shape: 'diamond',  color: '#4D96FF', colorName: 'синий',       bg: 'ocean'   },
+            { letter: 'Д', digit: 5, shape: 'circle',   color: '#4D96FF', colorName: 'голубой',     bg: 'ocean'   },
+            { letter: 'Л', digit: 5, shape: 'rounded',  color: '#4D96FF', colorName: 'голубой',     bg: 'ocean'   },
+            { letter: 'Х', digit: 5, shape: 'triangle', color: '#4D96FF', colorName: 'голубой',     bg: 'ocean'   },
+            { letter: 'Ы', digit: 5, shape: 'diamond',  color: '#4D96FF', colorName: 'голубой',     bg: 'ocean'   },
+            { letter: 'Е', digit: 6, shape: 'circle',   color: '#6BCB77', colorName: 'светло-зел.', bg: 'forest'  },
+            { letter: 'О', digit: 6, shape: 'rounded',  color: '#6BCB77', colorName: 'светло-зел.', bg: 'forest'  },
+            { letter: 'Ц', digit: 6, shape: 'triangle', color: '#6BCB77', colorName: 'светло-зел.', bg: 'forest'  },
+            { letter: 'Ь', digit: 6, shape: 'diamond',  color: '#6BCB77', colorName: 'светло-зел.', bg: 'forest'  },
+            { letter: 'Ё', digit: 7, shape: 'circle',   color: '#C0C0C0', colorName: 'серый',       bg: 'clouds'  },
+            { letter: 'Н', digit: 7, shape: 'rounded',  color: '#C0C0C0', colorName: 'серый',       bg: 'clouds'  },
+            { letter: 'Ъ', digit: 7, shape: 'triangle', color: '#C0C0C0', colorName: 'серый',       bg: 'clouds'  },
+            { letter: 'Г', digit: 8, shape: 'circle',   color: '#FF6B9D', colorName: 'розовый',     bg: 'sunset'  },
+            { letter: 'У', digit: 8, shape: 'rounded',  color: '#FF6B9D', colorName: 'розовый',     bg: 'sunset'  },
+            { letter: 'Ч', digit: 8, shape: 'triangle', color: '#FF6B9D', colorName: 'розовый',     bg: 'sunset'  },
+            { letter: 'Щ', digit: 8, shape: 'diamond',  color: '#FF6B9D', colorName: 'розовый',     bg: 'sunset'  },
+            { letter: 'Ж', digit: 9, shape: 'circle',   color: '#9B59B6', colorName: 'фиолетовый',  bg: 'space'   },
+            { letter: 'Р', digit: 9, shape: 'rounded',  color: '#9B59B6', colorName: 'фиолетовый',  bg: 'space'   },
+            { letter: 'Ш', digit: 9, shape: 'triangle', color: '#9B59B6', colorName: 'фиолетовый',  bg: 'space'   },
+        ];
+
+        const BACKGROUNDS = {
+            volcano: { top: '#1a0a0a', bottom: '#4a1515', elements: 'lava'    },
+            desert:  { top: '#1a1510', bottom: '#5a4a20', elements: 'sand'    },
+            forest:  { top: '#0a1a0a', bottom: '#1a4a1a', elements: 'trees'   },
+            ocean:   { top: '#0a0a2a', bottom: '#0a3a5a', elements: 'waves'   },
+            clouds:  { top: '#1a1a2a', bottom: '#3a3a5a', elements: 'clouds'  },
+            sunset:  { top: '#2a0a1a', bottom: '#5a2a3a', elements: 'flowers' },
+            space:   { top: '#0a0a1a', bottom: '#1a0a2a', elements: 'stars'   }
+        };
+
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resize();
+
+                this.state = 'menu';
+                this.gameMode = 'sequential';
+                this.menuSelection = 0;
+
+                this.lives = 3;
+                this.maxLives = 5;
+                this.score = 0;
+                this.currentLetterIndex = 0;
+                this.collectedCount = 0;
+                this.targetCount = 5;
+                this.speed = 2.5;
+                this.baseSpeed = 2.5;
+                this.speedMultiplier = 1;
+
+                this.dolphin = {
+                    x: 100, y: 0,
+                    vy: 0, width: 80, height: 50,
+                    angle: 0, invincible: 0, trail: []
+                };
+
+                this.isPressed = false;
+                this.gravity = 0.25;
+                this.jumpForce = -6;
+
+                this.shapes = [];
+                this.powerups = [];
+                this.particles = [];
+                this.bgElements = [];
+                this.floatingTexts = [];
+                this.screenShake = 0;
+
+                this.lastTime = 0;
+                this.shapeTimer = 0;
+                this.shapeInterval = 1500;
+                this.powerupTimer = 0;
+
+                this.wavePhase = 0;
+                this.bgTransition = 1;
+                this.currentBg = 'ocean';
+                this.targetBg = 'ocean';
+
+                this.slowMotion = 0;
+                this.speedBoost = 0;
+                this.magnet = 0;
+                this.combo = 0;
+                this.comboTimer = 0;
+
+                this.initEvents();
+                this.generateBgElements();
+                this.loop(0);
+            }
+
+            resize() {
+                this.width  = Math.min(window.innerWidth, 600);
+                this.height = window.innerHeight;
+                this.canvas.width  = this.width;
+                this.canvas.height = this.height;
+                this.dolphin && (this.dolphin.y = this.height / 2);
+            }
+
+            initEvents() {
+                const start = (e) => {
+                    e.preventDefault();
+                    this.isPressed = true;
+                    if (this.state === 'menu') {
+                        this.gameMode = this.menuSelection === 0 ? 'sequential' : 'random';
+                        this.startGame();
+                    } else if (this.state === 'gameover') {
+                        this.state = 'menu';
+                    } else if (this.state === 'letterComplete') {
+                        this.nextLetter();
+                    }
+                };
+                const move = (e) => {
+                    e.preventDefault();
+                    if (this.state === 'menu') {
+                        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                        const rect = this.canvas.getBoundingClientRect();
+                        const canvasY = (clientY - rect.top) * (this.height / rect.height);
+                        const seqY  = this.height / 2 + 20;
+                        const randY = this.height / 2 + 95;
+                        this.menuSelection = Math.abs(canvasY - seqY) < Math.abs(canvasY - randY) ? 0 : 1;
+                    }
+                };
+                const end = (e) => { e.preventDefault(); this.isPressed = false; };
+
+                this.canvas.addEventListener('touchstart', start, {passive: false});
+                this.canvas.addEventListener('touchmove',  move,  {passive: false});
+                this.canvas.addEventListener('touchend',   end,   {passive: false});
+                this.canvas.addEventListener('mousedown',  start);
+                this.canvas.addEventListener('mousemove',  move);
+                this.canvas.addEventListener('mouseup',    end);
+                window.addEventListener('resize', () => this.resize());
+            }
+
+            startGame() {
+                this.state = 'playing';
+                this.lives = 3;
+                this.score = 0;
+                this.currentLetterIndex = 0;
+                this.collectedCount = 0;
+                this.speed = this.baseSpeed;
+                this.speedMultiplier = 1;
+                this.shapes = [];
+                this.powerups = [];
+                this.particles = [];
+                this.floatingTexts = [];
+                this.dolphin.y = this.height / 2;
+                this.dolphin.vy = 0;
+                this.dolphin.invincible = 0;
+                this.dolphin.trail = [];
+                this.shapeTimer = 0;
+                this.powerupTimer = 0;
+                this.slowMotion = 0;
+                this.speedBoost = 0;
+                this.magnet = 0;
+                this.combo = 0;
+                this.comboTimer = 0;
+                this.screenShake = 0;
+                this.updateBackground();
+            }
+
+            nextLetter() {
+                if (this.gameMode === 'random') {
+                    let ni;
+                    do { ni = Math.floor(Math.random() * NEURO_TABLE.length); }
+                    while (ni === this.currentLetterIndex);
+                    this.currentLetterIndex = ni;
+                } else {
+                    this.currentLetterIndex = (this.currentLetterIndex + 1) % NEURO_TABLE.length;
+                }
+                this.collectedCount = 0;
+                this.state = 'playing';
+                this.shapes = [];
+                this.powerups = [];
+                this.updateBackground();
+                this.speed = Math.min(this.baseSpeed + (this.score / 500) * 0.3, 5);
+                this.speedMultiplier = 1;
+            }
+
+            updateBackground() {
+                this.targetBg = NEURO_TABLE[this.currentLetterIndex].bg;
+                this.bgTransition = 0;
+            }
+
+            generateBgElements() {
+                this.bgElements = [];
+                for (let i = 0; i < 25; i++) {
+                    this.bgElements.push({
+                        x: Math.random() * this.width,
+                        y: Math.random() * this.height,
+                        size:  Math.random() * 30 + 10,
+                        speed: Math.random() * 0.5 + 0.2,
+                        type: 'star'
+                    });
+                }
+            }
+
+            getCurrentLetter() { return NEURO_TABLE[this.currentLetterIndex]; }
+
+            spawnShape() {
+                const current = this.getCurrentLetter();
+                const isCorrect = Math.random() < 0.42;
+                let data;
+                if (isCorrect) {
+                    data = current;
+                } else {
+                    const others = NEURO_TABLE.filter((_, i) => i !== this.currentLetterIndex);
+                    data = others[Math.floor(Math.random() * others.length)];
+                }
+                this.shapes.push({
+                    x: this.width + 60,
+                    y: Math.random() * (this.height - 250) + 120,
+                    size: 45,
+                    ...data,
+                    isCorrect,
+                    rotation: 0,
+                    glow: 0
+                });
+            }
+
+            spawnPowerup() {
+                const types = ['slow','speed','heart','magnet','shield'];
+                this.powerups.push({
+                    x: this.width + 60,
+                    y: Math.random() * (this.height - 250) + 120,
+                    size: 35,
+                    type: types[Math.floor(Math.random() * types.length)],
+                    rotation: 0,
+                    pulse: 0
+                });
+            }
+
+            applyPowerup(type) {
+                switch(type) {
+                    case 'slow':
+                        this.slowMotion = 5000; this.speedMultiplier = 0.3;
+                        this.addFloatingText('🐢 ЗАМЕДЛЕНИЕ!', this.width/2, this.height/2, '#00FF88');
+                        this.createAura('#00FF88', 30); break;
+                    case 'speed':
+                        this.speedBoost = 3000; this.speedMultiplier = 2.5;
+                        this.addFloatingText('⚡ УСКОРЕНИЕ!', this.width/2, this.height/2, '#FFD700');
+                        this.createAura('#FFD700', 30); break;
+                    case 'heart':
+                        if (this.lives < this.maxLives) {
+                            this.lives++;
+                            this.addFloatingText('❤️ +1 ЖИЗНЬ!', this.width/2, this.height/2, '#FF6B6B');
+                            this.createAura('#FF6B6B', 20);
+                        } else {
+                            this.score += 50;
+                            this.addFloatingText('⭐ +50 БОНУС!', this.width/2, this.height/2, '#FFD700');
+                        }
+                        break;
+                    case 'magnet':
+                        this.magnet = 4000;
+                        this.addFloatingText('🧲 МАГНИТ!', this.width/2, this.height/2, '#9B59B6');
+                        this.createAura('#9B59B6', 25); break;
+                    case 'shield':
+                        this.dolphin.invincible = 5000;
+                        this.addFloatingText('🛡️ ЩИТ!', this.width/2, this.height/2, '#4ECDC4');
+                        this.createAura('#4ECDC4', 25); break;
+                }
+            }
+
+            addFloatingText(text, x, y, color) {
+                this.floatingTexts.push({ text, x, y, vy: -2, life: 1.5, color, scale: 1 });
+            }
+
+            createAura(color, count) {
+                for (let i = 0; i < count; i++) {
+                    const a = (Math.PI * 2 / count) * i;
+                    this.particles.push({
+                        x: this.dolphin.x + this.dolphin.width/2,
+                        y: this.dolphin.y + this.dolphin.height/2,
+                        vx: Math.cos(a)*6, vy: Math.sin(a)*6,
+                        size: Math.random()*8+4, color, life: 1, type: 'aura'
+                    });
+                }
+            }
+
+            update(dt) {
+                if (this.state !== 'playing') return;
+
+                let timeScale = 1;
+                if (this.slowMotion > 0) {
+                    this.slowMotion -= dt; timeScale = 0.4;
+                    if (this.slowMotion <= 0) { this.slowMotion = 0; this.speedMultiplier = 1; }
+                }
+                if (this.speedBoost > 0) {
+                    this.speedBoost -= dt;
+                    if (this.speedBoost <= 0) { this.speedBoost = 0; this.speedMultiplier = 1; }
+                }
+                if (this.magnet > 0)           this.magnet -= dt;
+                if (this.dolphin.invincible > 0) this.dolphin.invincible -= dt;
+                if (this.comboTimer > 0) {
+                    this.comboTimer -= dt;
+                    if (this.comboTimer <= 0) this.combo = 0;
+                }
+
+                const eDt = dt * timeScale;
+                this.wavePhase += eDt * 0.002;
+
+                if (this.bgTransition < 1) {
+                    this.bgTransition = Math.min(1, this.bgTransition + eDt * 0.001);
+                    if (this.bgTransition >= 1) this.currentBg = this.targetBg;
+                }
+
+                if (this.isPressed) this.dolphin.vy += this.jumpForce * 0.1;
+                this.dolphin.vy = (this.dolphin.vy + this.gravity) * 0.98;
+                this.dolphin.y += this.dolphin.vy;
+
+                this.dolphin.trail.push({
+                    x: this.dolphin.x + this.dolphin.width/2 - 30,
+                    y: this.dolphin.y + this.dolphin.height/2,
+                    life: 1
+                });
+                if (this.dolphin.trail.length > 15) this.dolphin.trail.shift();
+                for (let t of this.dolphin.trail) t.life -= 0.07;
+                this.dolphin.trail = this.dolphin.trail.filter(t => t.life > 0);
+                this.dolphin.angle = Math.atan2(this.dolphin.vy, 5) * 0.5;
+
+                if (this.dolphin.y > this.height + 50) {
+                    if (this.dolphin.invincible <= 0) {
+                        this.lives--;
+                        this.screenShake = 20;
+                        this.createParticles(this.dolphin.x + 40, this.height - 20, '#FF4444', 25);
+                        if (this.lives <= 0) { this.state = 'gameover'; return; }
+                    }
+                    this.dolphin.y = this.height / 2;
+                    this.dolphin.vy = -5;
+                }
+                if (this.dolphin.y < -50) { this.dolphin.y = -50; this.dolphin.vy = 2; }
+
+                this.shapeTimer += eDt;
+                const interval = this.slowMotion > 0 ? this.shapeInterval * 2.5 : this.shapeInterval;
+                if (this.shapeTimer > interval) {
+                    this.spawnShape();
+                    this.shapeTimer = 0;
+                    this.shapeInterval = Math.max(700, 1500 - this.speed * 80);
+                }
+
+                this.powerupTimer += eDt;
+                if (this.powerupTimer > 8000) { this.spawnPowerup(); this.powerupTimer = 0; }
+
+                const actualSpeed = this.speed * this.speedMultiplier;
+
+                for (let i = this.shapes.length - 1; i >= 0; i--) {
+                    const s = this.shapes[i];
+                    s.x -= actualSpeed;
+                    s.rotation += 0.02;
+                    s.glow = Math.sin(Date.now() * 0.003) * 0.3 + 0.7;
+
+                    if (this.magnet > 0 && s.isCorrect) {
+                        const dx = (this.dolphin.x + 40) - s.x;
+                        const dy = (this.dolphin.y + 25) - s.y;
+                        if (Math.hypot(dx, dy) < 200) { s.x += dx * 0.08; s.y += dy * 0.08; }
+                    }
+
+                    const dx = s.x - (this.dolphin.x + this.dolphin.width/2);
+                    const dy = s.y - (this.dolphin.y + this.dolphin.height/2);
+                    if (Math.hypot(dx, dy) < s.size + 35) {
+                        if (s.isCorrect) {
+                            this.combo++;
+                            this.comboTimer = 2000;
+                            const pts = 10 * Math.min(this.combo, 5);
+                            this.score += pts;
+                            this.collectedCount++;
+                            this.createParticles(s.x, s.y, s.color, 20);
+                            this.addFloatingText(
+                                this.combo > 1 ? `🔥 COMBO x${this.combo}! +${pts}` : `+${pts}`,
+                                s.x, s.y - 35,
+                                this.combo > 1 ? '#FF6B00' : '#FFD700'
+                            );
+                            if (this.collectedCount >= this.targetCount) {
+                                this.state = 'letterComplete';
+                                this.createAura('#FFD700', 50);
+                            }
+                        } else {
+                            this.combo = 0;
+                            if (this.dolphin.invincible <= 0) {
+                                this.lives--;
+                                this.screenShake = 15;
+                                this.createParticles(s.x, s.y, '#FF0000', 20);
+                                this.addFloatingText('💥 ОШИБКА!', s.x, s.y - 30, '#FF4444');
+                                if (this.lives <= 0) { this.state = 'gameover'; return; }
+                            } else {
+                                this.addFloatingText('🛡️ ЩИТ СПАС!', s.x, s.y - 30, '#4ECDC4');
+                                this.createParticles(s.x, s.y, '#4ECDC4', 15);
+                            }
+                        }
+                        this.shapes.splice(i, 1);
+                        continue;
+                    }
+                    if (s.x < -100) this.shapes.splice(i, 1);
+                }
+
+                for (let i = this.powerups.length - 1; i >= 0; i--) {
+                    const p = this.powerups[i];
+                    p.x -= actualSpeed * 0.8;
+                    p.rotation += 0.03;
+                    p.pulse += 0.05;
+                    const dx = p.x - (this.dolphin.x + this.dolphin.width/2);
+                    const dy = p.y - (this.dolphin.y + this.dolphin.height/2);
+                    if (Math.hypot(dx, dy) < p.size + 40) {
+                        this.applyPowerup(p.type);
+                        this.createParticles(p.x, p.y, '#FFFFFF', 15);
+                        this.powerups.splice(i, 1);
+                        continue;
+                    }
+                    if (p.x < -100) this.powerups.splice(i, 1);
+                }
+
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.life -= 0.025;
+                    if (p.life <= 0) this.particles.splice(i, 1);
+                }
+
+                for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+                    const ft = this.floatingTexts[i];
+                    ft.y += ft.vy; ft.life -= 0.02;
+                    ft.scale = 1 + (1.5 - ft.life) * 0.3;
+                    if (ft.life <= 0) this.floatingTexts.splice(i, 1);
+                }
+
+                if (this.screenShake > 0) { this.screenShake *= 0.9; if (this.screenShake < 0.5) this.screenShake = 0; }
+
+                for (let el of this.bgElements) {
+                    el.x -= el.speed * (this.slowMotion > 0 ? 0.3 : 1);
+                    if (el.x < -50) { el.x = this.width + 50; el.y = Math.random() * this.height; }
+                }
+            }
+
+            createParticles(x, y, color, count=15) {
+                for (let i = 0; i < count; i++) {
+                    const a = Math.random() * Math.PI * 2;
+                    const sp = Math.random() * 6 + 2;
+                    this.particles.push({
+                        x, y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp - 2,
+                        size: Math.random()*6+2, color, life: 1, type: 'normal'
+                    });
+                }
+            }
+
+            draw() {
+                const ctx = this.ctx;
+                ctx.save();
+                if (this.screenShake > 0) {
+                    ctx.translate((Math.random()-.5)*this.screenShake, (Math.random()-.5)*this.screenShake);
+                }
+                ctx.clearRect(0, 0, this.width, this.height);
+                this.drawBackground(ctx);
+                this.drawBgElements(ctx);
+
+                if (this.state === 'menu')           { this.drawMenu(ctx);         ctx.restore(); return; }
+                if (this.state === 'gameover')        { this.drawGame(ctx); this.drawGameOver(ctx);       ctx.restore(); return; }
+                if (this.state === 'letterComplete')  { this.drawGame(ctx); this.drawLetterComplete(ctx); ctx.restore(); return; }
+                this.drawGame(ctx);
+                ctx.restore();
+            }
+
+            drawBackground(ctx) {
+                const bg1 = BACKGROUNDS[this.currentBg];
+                const bg2 = BACKGROUNDS[this.targetBg];
+                const t   = this.bgTransition;
+                const lerp = (c1, c2, f) => {
+                    const p = s => [parseInt(s.slice(1,3),16), parseInt(s.slice(3,5),16), parseInt(s.slice(5,7),16)];
+                    const [r1,g1,b1] = p(c1), [r2,g2,b2] = p(c2);
+                    return `rgb(${Math.round(r1+(r2-r1)*f)},${Math.round(g1+(g2-g1)*f)},${Math.round(b1+(b2-b1)*f)})`;
+                };
+                const gr = ctx.createLinearGradient(0, 0, 0, this.height);
+                gr.addColorStop(0, lerp(bg1.top,    bg2.top,    t));
+                gr.addColorStop(1, lerp(bg1.bottom, bg2.bottom, t));
+                ctx.fillStyle = gr;
+                ctx.fillRect(0, 0, this.width, this.height);
+
+                if (this.slowMotion > 0) {
+                    const v = ctx.createRadialGradient(this.width/2, this.height/2, 50, this.width/2, this.height/2, this.width);
+                    v.addColorStop(0,'rgba(0,255,150,0)'); v.addColorStop(1,'rgba(0,255,150,0.15)');
+                    ctx.fillStyle = v; ctx.fillRect(0, 0, this.width, this.height);
+                }
+                if (this.speedBoost > 0) {
+                    const v = ctx.createRadialGradient(this.width/2, this.height/2, 50, this.width/2, this.height/2, this.width);
+                    v.addColorStop(0,'rgba(255,200,0,0)'); v.addColorStop(1,'rgba(255,200,0,0.15)');
+                    ctx.fillStyle = v; ctx.fillRect(0, 0, this.width, this.height);
+                }
+            }
+
+            drawBgElements(ctx) {
+                const bg = BACKGROUNDS[this.currentBg];
+                ctx.save();
+                ctx.globalAlpha = 0.12;
+                for (let el of this.bgElements) {
+                    if (bg.elements === 'stars' || bg.elements === 'clouds') {
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.beginPath(); ctx.arc(el.x, el.y, el.size*.3, 0, Math.PI*2); ctx.fill();
+                    } else if (bg.elements === 'waves') {
+                        ctx.strokeStyle = 'rgba(100,200,255,.2)'; ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.moveTo(el.x, el.y);
+                        ctx.lineTo(el.x+30, el.y + Math.sin(this.wavePhase+el.x)*10); ctx.stroke();
+                    } else if (bg.elements === 'trees') {
+                        ctx.fillStyle = 'rgba(50,150,50,.2)';
+                        ctx.beginPath(); ctx.moveTo(el.x, el.y); ctx.lineTo(el.x-10, el.y+30); ctx.lineTo(el.x+10, el.y+30); ctx.closePath(); ctx.fill();
+                    } else if (bg.elements === 'lava') {
+                        ctx.fillStyle = 'rgba(255,100,50,.2)';
+                        ctx.beginPath(); ctx.arc(el.x, el.y, el.size*.4, 0, Math.PI*2); ctx.fill();
+                    } else if (bg.elements === 'flowers') {
+                        ctx.fillStyle = 'rgba(255,150,200,.2)';
+                        ctx.beginPath(); ctx.arc(el.x, el.y, el.size*.25, 0, Math.PI*2); ctx.fill();
+                    } else if (bg.elements === 'sand') {
+                        ctx.fillStyle = 'rgba(200,180,100,.15)';
+                        ctx.beginPath(); ctx.arc(el.x, el.y, el.size*.2, 0, Math.PI*2); ctx.fill();
+                    }
+                }
+                ctx.restore();
+            }
+
+            drawGame(ctx) {
+                for (let t of this.dolphin.trail) {
+                    ctx.save();
+                    ctx.globalAlpha = t.life * 0.4;
+                    ctx.fillStyle = '#4ECDC4';
+                    ctx.beginPath(); ctx.arc(t.x, t.y, 8*t.life, 0, Math.PI*2); ctx.fill();
+                    ctx.restore();
+                }
+                this.drawDolphin(ctx);
+                for (let s of this.shapes)  this.drawShape(ctx, s);
+                for (let p of this.powerups) this.drawPowerup(ctx, p);
+                for (let p of this.particles) {
+                    ctx.save(); ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.size*p.life, 0, Math.PI*2); ctx.fill(); ctx.restore();
+                }
+                for (let ft of this.floatingTexts) {
+                    ctx.save(); ctx.globalAlpha = Math.min(ft.life, 1); ctx.fillStyle = ft.color;
+                    ctx.font = `bold ${Math.round(18*ft.scale)}px Arial`; ctx.textAlign = 'center';
+                    ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 3;
+                    ctx.strokeText(ft.text, ft.x, ft.y); ctx.fillText(ft.text, ft.x, ft.y);
+                    ctx.restore();
+                }
+                this.drawUI(ctx);
+            }
+
+            drawDolphin(ctx) {
+                ctx.save();
+                ctx.translate(this.dolphin.x + this.dolphin.width/2, this.dolphin.y + this.dolphin.height/2);
+                ctx.rotate(this.dolphin.angle);
+                const w = this.dolphin.width, h = this.dolphin.height;
+
+                if (this.dolphin.invincible > 0) {
+                    const pulse = Math.sin(Date.now()*.01)*.3+.7;
+                    ctx.save(); ctx.globalAlpha = pulse*.6; ctx.strokeStyle = '#4ECDC4'; ctx.lineWidth = 3;
+                    ctx.beginPath(); ctx.arc(0, 0, w/2+15, 0, Math.PI*2); ctx.stroke();
+                    ctx.fillStyle = 'rgba(78,205,196,.1)'; ctx.fill(); ctx.restore();
+                }
+                if (this.magnet > 0) {
+                    const pulse = Math.sin(Date.now()*.008)*.3+.7;
+                    ctx.save(); ctx.globalAlpha = pulse*.4; ctx.strokeStyle = '#9B59B6'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(0, 0, 120, 0, Math.PI*2); ctx.stroke();
+                    ctx.setLineDash([5,5]); ctx.beginPath(); ctx.arc(0, 0, 140, 0, Math.PI*2); ctx.stroke();
+                    ctx.setLineDash([]); ctx.restore();
+                }
+
+                ctx.fillStyle = '#4ECDC4';
+                ctx.beginPath(); ctx.ellipse(0, 0, w/2, h/2, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#A8E6CF';
+                ctx.beginPath(); ctx.ellipse(5, 5, w/2.5, h/2.5, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#2E8B8B';
+                ctx.beginPath(); ctx.moveTo(-10,-h/2); ctx.lineTo(5,-h/2-15); ctx.lineTo(20,-h/2); ctx.closePath(); ctx.fill();
+                ctx.fillStyle = '#4ECDC4';
+                ctx.beginPath(); ctx.moveTo(-w/2,0); ctx.lineTo(-w/2-20,-10); ctx.lineTo(-w/2-20,10); ctx.closePath(); ctx.fill();
+                ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(15,-5,6,0,Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#000000'; ctx.beginPath(); ctx.arc(17,-5,3,0,Math.PI*2); ctx.fill();
+
+                const current = this.getCurrentLetter();
+                ctx.fillStyle = '#FFD700'; ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(current.letter, 0, 2);
+                ctx.restore();
+            }
+
+            drawShape(ctx, shape) {
+                ctx.save();
+                ctx.translate(shape.x, shape.y);
+                ctx.rotate(shape.rotation);
+                const s = shape.size;
+
+                if (shape.isCorrect) {
+                    ctx.save(); ctx.globalAlpha = shape.glow*.3; ctx.fillStyle = shape.color;
+                    ctx.beginPath(); ctx.arc(0, 0, s/1.5, 0, Math.PI*2); ctx.fill(); ctx.restore();
+                }
+
+                ctx.fillStyle = 'rgba(30,20,50,.85)';
+                ctx.beginPath(); ctx.roundRect(-s/2-5,-s/2-5,s+10,s+10,12); ctx.fill();
+                ctx.strokeStyle = shape.isCorrect ? 'rgba(255,215,0,.5)' : 'rgba(100,100,100,.3)';
+                ctx.lineWidth = shape.isCorrect ? 2 : 1; ctx.stroke();
+
+                ctx.fillStyle = shape.color;
+                ctx.beginPath();
+                switch(shape.shape) {
+                    case 'circle':   ctx.arc(0,0,s/2.5,0,Math.PI*2); break;
+                    case 'rounded':  ctx.roundRect(-s/2.5,-s/2.5,s/1.25,s/1.25,15); break;
+                    case 'triangle': ctx.moveTo(0,-s/2.5); ctx.lineTo(-s/2.5,s/2.5); ctx.lineTo(s/2.5,s/2.5); ctx.closePath(); break;
+                    case 'diamond':  ctx.moveTo(0,-s/2.5); ctx.lineTo(s/2.5,0); ctx.lineTo(0,s/2.5); ctx.lineTo(-s/2.5,0); ctx.closePath(); break;
+                }
+                ctx.fill();
+
+                ctx.fillStyle = '#FFFFFF'; ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(shape.digit, 0, 0);
+                ctx.fillStyle = '#FFD700'; ctx.font = 'bold 14px Arial';
+                ctx.fillText(shape.letter, 0, -s/2-12);
+                ctx.restore();
+            }
+
+            drawPowerup(ctx, p) {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation);
+                const s = p.size, pulse = Math.sin(p.pulse)*.2+.8;
+                const colors = { slow:'#00FF88', speed:'#FFD700', heart:'#FF6B6B', magnet:'#9B59B6', shield:'#4ECDC4' };
+                const icons  = { slow:'🐢', speed:'⚡', heart:'❤️', magnet:'🧲', shield:'🛡️' };
+                ctx.save(); ctx.globalAlpha = .4*pulse; ctx.fillStyle = colors[p.type];
+                ctx.beginPath(); ctx.arc(0,0,s*1.2,0,Math.PI*2); ctx.fill(); ctx.restore();
+                ctx.fillStyle = 'rgba(255,255,255,.15)';
+                ctx.beginPath(); ctx.arc(0,0,s/2,0,Math.PI*2); ctx.fill();
+                ctx.strokeStyle = colors[p.type]; ctx.lineWidth = 2; ctx.stroke();
+                ctx.fillStyle = colors[p.type]; ctx.font = 'bold 22px Arial';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(icons[p.type], 0, 0);
+                ctx.restore();
+            }
+
+            drawUI(ctx) {
+                const current = this.getCurrentLetter();
+                ctx.fillStyle = 'rgba(20,10,40,.9)';
+                ctx.beginPath(); ctx.roundRect(10,10,this.width-20,85,15); ctx.fill();
+                ctx.strokeStyle = 'rgba(255,215,0,.2)'; ctx.lineWidth = 1; ctx.stroke();
+
+                ctx.fillStyle = '#AAAAAA'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'left';
+                ctx.fillText('Собирай:', 25, 32);
+
+                ctx.save(); ctx.translate(105, 50);
+                ctx.fillStyle = current.color; ctx.beginPath();
+                const ms = 18;
+                switch(current.shape) {
+                    case 'circle':   ctx.arc(0,0,ms,0,Math.PI*2); break;
+                    case 'rounded':  ctx.roundRect(-ms,-ms,ms*2,ms*2,8); break;
+                    case 'triangle': ctx.moveTo(0,-ms); ctx.lineTo(-ms,ms); ctx.lineTo(ms,ms); ctx.closePath(); break;
+                    case 'diamond':  ctx.moveTo(0,-ms); ctx.lineTo(ms,0); ctx.lineTo(0,ms); ctx.lineTo(-ms,0); ctx.closePath(); break;
+                }
+                ctx.fill();
+                ctx.fillStyle = '#FFF'; ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center'; ctx.fillText(current.digit, 0, 0);
+                ctx.restore();
+
+                ctx.fillStyle = '#FFF'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center';
+                ctx.fillText(`${this.collectedCount}/${this.targetCount}`, this.width/2, 40);
+                const bw = 100, bh = 8, bx = this.width/2-bw/2, by = 55;
+                ctx.fillStyle = 'rgba(255,255,255,.2)';
+                ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,4); ctx.fill();
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath(); ctx.roundRect(bx,by,bw*(this.collectedCount/this.targetCount),bh,4); ctx.fill();
+
+                const hx = this.width - 25;
+                for (let i = 0; i < this.maxLives; i++) {
+                    ctx.font = '22px Arial'; ctx.fillStyle = i < this.lives ? '#FF6B6B' : 'rgba(255,107,107,.2)';
+                    ctx.textAlign = 'right'; ctx.fillText('❤️', hx - i*28, 35);
+                }
+                ctx.fillStyle = '#FFD700'; ctx.font = 'bold 18px Arial'; ctx.textAlign = 'right';
+                ctx.fillText(this.score, this.width-25, 72);
+
+                if (this.combo > 1) {
+                    ctx.fillStyle = '#FF6B00'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'left';
+                    ctx.fillText(`🔥 COMBO x${this.combo}`, 25, 72);
+                }
+
+                ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.font = '12px Arial'; ctx.textAlign = 'right';
+                ctx.fillText(this.gameMode === 'random' ? '🔀 Случайный' : '➡️ По порядку', this.width-20, 100);
+
+                let ey = 115;
+                const effects = [];
+                if (this.slowMotion > 0)         effects.push({icon:'🐢', color:'#00FF88', time:this.slowMotion, max:5000});
+                if (this.speedBoost > 0)          effects.push({icon:'⚡', color:'#FFD700', time:this.speedBoost, max:3000});
+                if (this.magnet > 0)              effects.push({icon:'🧲', color:'#9B59B6', time:this.magnet,     max:4000});
+                if (this.dolphin.invincible > 0)  effects.push({icon:'🛡️', color:'#4ECDC4', time:this.dolphin.invincible, max:5000});
+                for (let ef of effects) {
+                    ctx.fillStyle = 'rgba(20,10,40,.8)'; ctx.beginPath(); ctx.roundRect(10,ey,50,28,8); ctx.fill();
+                    ctx.fillStyle = ef.color; ctx.font = '18px Arial'; ctx.textAlign = 'center'; ctx.fillText(ef.icon, 35, ey+20);
+                    ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(65,ey+10,60,6);
+                    ctx.fillStyle = ef.color; ctx.fillRect(65,ey+10,60*(ef.time/ef.max),6);
+                    ey += 35;
+                }
+            }
+
+            drawMenu(ctx) {
+                ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(0,0,this.width,this.height);
+
+                for (let i = 0; i < 30; i++) {
+                    const x = (Math.sin(Date.now()*.001+i*2)*.5+.5)*this.width;
+                    const y = (Math.cos(Date.now()*.0013+i*3)*.5+.5)*this.height;
+                    ctx.fillStyle = `rgba(255,215,0,${Math.random()*.4})`;
+                    ctx.beginPath(); ctx.arc(x, y, Math.random()*2+1, 0, Math.PI*2); ctx.fill();
+                }
+
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#4ECDC4'; ctx.font = '70px Arial';
+                ctx.fillText('🐬', this.width/2, this.height/2 - 160);
+                ctx.fillStyle = '#FFFFFF'; ctx.font = 'bold 34px Arial';
+                ctx.fillText('НЕЙРОГЕНЕЗ', this.width/2, this.height/2 - 90);
+                ctx.fillStyle = '#FFD700'; ctx.font = 'bold 26px Arial';
+                ctx.fillText('ДЕЛЬФИН', this.width/2, this.height/2 - 55);
+
+                const seqY = this.height/2 + 20;
+                const isSeq = this.menuSelection === 0;
+                ctx.fillStyle = isSeq ? 'rgba(255,215,0,.25)' : 'rgba(255,255,255,.08)';
+                ctx.beginPath(); ctx.roundRect(this.width/2-140, seqY-30, 280, 55, 15); ctx.fill();
+                if (isSeq) { ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2; ctx.stroke(); }
+                ctx.fillStyle = isSeq ? '#FFD700' : '#AAAAAA'; ctx.font = 'bold 18px Arial';
+                ctx.fillText('➡️ ПО ПОРЯДКУ', this.width/2, seqY-5);
+                ctx.fillStyle = isSeq ? '#CCCCCC' : '#777777'; ctx.font = '13px Arial';
+                ctx.fillText('Буквы меняются по порядку таблицы', this.width/2, seqY+18);
+
+                const randY = this.height/2 + 95;
+                const isRand = this.menuSelection === 1;
+                ctx.fillStyle = isRand ? 'rgba(255,107,107,.25)' : 'rgba(255,255,255,.08)';
+                ctx.beginPath(); ctx.roundRect(this.width/2-140, randY-30, 280, 55, 15); ctx.fill();
+                if (isRand) { ctx.strokeStyle = '#FF6B6B'; ctx.lineWidth = 2; ctx.stroke(); }
+                ctx.fillStyle = isRand ? '#FF6B6B' : '#AAAAAA'; ctx.font = 'bold 18px Arial';
+                ctx.fillText('🔀 СЛУЧАЙНЫЙ', this.width/2, randY-5);
+                ctx.fillStyle = isRand ? '#CCCCCC' : '#777777'; ctx.font = '13px Arial';
+                ctx.fillText('Буквы и цвета меняются хаотично', this.width/2, randY+18);
+
+                ctx.fillStyle = '#888'; ctx.font = '13px Arial';
+                ctx.fillText('Нажми — плыть вверх  |  Отпусти — падать', this.width/2, this.height/2+160);
+                ctx.fillText('🐢⚡❤️🧲🛡️ Лови бонусы для экшена!',      this.width/2, this.height/2+180);
+
+                ctx.fillStyle = 'rgba(255,215,0,.15)';
+                ctx.beginPath(); ctx.roundRect(this.width/2-130, this.height/2+210, 260, 50, 25); ctx.fill();
+                ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.fillStyle = '#FFD700'; ctx.font = 'bold 20px Arial';
+                ctx.globalAlpha = Math.sin(Date.now()*.005)*.3+.7;
+                ctx.fillText('▶ НАЖМИ, ЧТОБЫ НАЧАТЬ', this.width/2, this.height/2+235);
+                ctx.globalAlpha = 1;
+
+                ctx.fillStyle = '#FFD700'; ctx.font = '20px Arial';
+                ctx.fillText('◄', this.width/2-155, this.menuSelection===0?seqY:randY);
+                ctx.fillText('►', this.width/2+155, this.menuSelection===0?seqY:randY);
+            }
+
+            drawGameOver(ctx) {
+                ctx.fillStyle = 'rgba(0,0,0,.82)'; ctx.fillRect(0,0,this.width,this.height);
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+                ctx.font = '64px Arial'; ctx.fillText('💀', this.width/2, this.height/2-130);
+
+                ctx.fillStyle = '#FF6B6B'; ctx.font = 'bold 36px Arial';
+                ctx.fillText('ИГРА ОКОНЧЕНА', this.width/2, this.height/2-65);
+
+                ctx.fillStyle = '#FFD700'; ctx.font = 'bold 30px Arial';
+                ctx.fillText(`Счёт: ${this.score}`, this.width/2, this.height/2);
+
+                const cur = this.getCurrentLetter();
+                ctx.fillStyle = '#AAAAAA'; ctx.font = '18px Arial';
+                ctx.fillText(`Последняя буква: ${cur.letter} (${cur.digit}, ${cur.colorName})`, this.width/2, this.height/2+50);
+
+                ctx.fillStyle = 'rgba(255,215,0,.15)';
+                ctx.beginPath(); ctx.roundRect(this.width/2-130, this.height/2+90, 260, 50, 25); ctx.fill();
+                ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.fillStyle = '#FFD700'; ctx.font = 'bold 18px Arial';
+                ctx.globalAlpha = Math.sin(Date.now()*.005)*.3+.7;
+                ctx.fillText('▶ НАЖМИ ДЛЯ ПЕРЕЗАПУСКА', this.width/2, this.height/2+115);
+                ctx.globalAlpha = 1;
+            }
+
+            drawLetterComplete(ctx) {
+                ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(0,0,this.width,this.height);
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+                ctx.font = '70px Arial'; ctx.fillText('⭐', this.width/2, this.height/2-140);
+
+                const cur = this.getCurrentLetter();
+                ctx.fillStyle = cur.color; ctx.font = 'bold 52px Arial';
+                ctx.shadowColor = cur.color; ctx.shadowBlur = 20;
+                ctx.fillText(cur.letter, this.width/2, this.height/2-65);
+                ctx.shadowBlur = 0;
+
+                ctx.fillStyle = '#FFFFFF'; ctx.font = 'bold 28px Arial';
+                ctx.fillText('БУКВА ОСВОЕНА!', this.width/2, this.height/2+5);
+
+                ctx.fillStyle = '#FFD700'; ctx.font = '20px Arial';
+                ctx.fillText(`Цифра: ${cur.digit}  •  ${cur.colorName}`, this.width/2, this.height/2+45);
+
+                ctx.fillStyle = '#AAAAAA'; ctx.font = '18px Arial';
+                ctx.fillText(`Счёт: ${this.score}`, this.width/2, this.height/2+82);
+
+                ctx.fillStyle = '#00FF88'; ctx.font = 'bold 20px Arial';
+                ctx.globalAlpha = Math.sin(Date.now()*.005)*.3+.7;
+                ctx.fillText('▶ НАЖМИ ДЛЯ ПРОДОЛЖЕНИЯ', this.width/2, this.height/2+130);
+                ctx.globalAlpha = 1;
+            }
+
+            loop(timestamp) {
+                const dt = Math.min(timestamp - this.lastTime, 50);
+                this.lastTime = timestamp;
+                this.update(dt);
+                this.draw();
+                requestAnimationFrame(ts => this.loop(ts));
+            }
+        }
+
+        new Game();
+    </script>
+</body>
+</html>
